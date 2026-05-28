@@ -474,7 +474,7 @@ export const spotifyPlayTrack = createServerFn({ method: "POST" })
     const userId = requireUser(session);
     const { accessToken } = await getValidSpotifyAccessToken(userId);
 
-    await spotifyPut(`/me/player?device_id=${encodeURIComponent(data.deviceId)}`, accessToken, {
+    await spotifyPut(`/me/player`, accessToken, {
       device_ids: [data.deviceId],
       play: false,
     });
