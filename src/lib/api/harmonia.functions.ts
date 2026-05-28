@@ -99,6 +99,33 @@ async function fetchPlaylistItems(
   return fetchFrom(baseTracks);
 }
 
+async function fetchPlaylistMetaFromMe(
+  spotifyGet: <T>(path: string, accessToken: string) => Promise<T>,
+  accessToken: string,
+  playlistId: string,
+) {
+  let offset = 0;
+  const limit = 50;
+  while (true) {
+    const page = await spotifyGet<{
+      items: Array<{
+        id: string;
+        name: string;
+        snapshot_id: string;
+        images: Array<{ url: string }>;
+        owner: { display_name: string };
+      }>;
+      next: string | null;
+    }>(`/me/playlists?limit=${limit}&offset=${offset}`, accessToken);
+
+    const found = page.items.find((p) => p.id === playlistId);
+    if (found) return found;
+    if (!page.next) break;
+    offset += limit;
+  }
+  throw new Error("Playlist não encontrada nas playlists da conta conectada.");
+}
+
 export const authSignUp = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(6) }),
@@ -286,13 +313,11 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
     );
     if (!eventCheck.rows[0]) throw new Error("Evento não encontrado");
 
-    const playlist = await spotifyGet<{
-      id: string;
-      name: string;
-      snapshot_id: string;
-      images: Array<{ url: string }>;
-      owner: { display_name: string };
-    }>(`/playlists/${data.spotify_playlist_id}`, accessToken);
+    const playlist = await fetchPlaylistMetaFromMe(
+      spotifyGet,
+      accessToken,
+      data.spotify_playlist_id,
+    );
 
     const tracks = await fetchPlaylistItems(spotifyGet, accessToken, data.spotify_playlist_id);
 

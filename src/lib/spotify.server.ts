@@ -104,7 +104,7 @@ export async function spotifyGet<T>(path: string, accessToken: string): Promise<
     } catch {
       // ignore parse errors
     }
-    throw new Error(`Spotify API request failed (${res.status})${detail}`);
+    throw new Error(`Spotify API request failed (${res.status}) on ${path}${detail}`);
   }
   return (await res.json()) as T;
 }
