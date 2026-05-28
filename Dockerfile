@@ -21,8 +21,12 @@ ENV __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=harmonia.portaldoarinos57.org
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/src ./src
+COPY --from=build /app/vite.config.ts ./vite.config.ts
+COPY --from=build /app/tsconfig.json ./tsconfig.json
+COPY --from=build /app/components.json ./components.json
 
 EXPOSE 3000
 
-# Serve built app in production mode behind reverse proxy.
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
+# Run Vite dev server in container for current TanStack Start setup.
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
