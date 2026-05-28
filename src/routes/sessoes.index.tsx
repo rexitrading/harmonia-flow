@@ -13,7 +13,7 @@ import { Plus, Calendar, Trash2 } from "lucide-react";
 import { PRESETS } from "@/lib/preset-momentos";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/sessoes")({
+export const Route = createFileRoute("/sessoes/")({
   head: () => ({ meta: [{ title: "Sessões — Harmonia" }] }),
   component: SessoesPage,
 });
