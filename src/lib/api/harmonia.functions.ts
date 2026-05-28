@@ -31,6 +31,17 @@ type SpotifyPlaylistItem = {
     external_urls?: { spotify?: string } | null;
     type?: string;
   } | null;
+  item?: {
+    id?: string | null;
+    uri?: string | null;
+    name?: string;
+    artists?: Array<{ name: string }>;
+    album?: { name: string };
+    duration_ms?: number;
+    preview_url?: string | null;
+    external_urls?: { spotify?: string } | null;
+    type?: string;
+  } | null;
 };
 
 function requireUser(session: { data: { userId?: string } }) {
@@ -363,12 +374,30 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
     let nextOrder = orderRes.rows[0].value;
 
     let importedCount = 0;
+    let totalItems = 0;
+    let nullTrackItems = 0;
+    let localItems = 0;
+    let skippedNoId = 0;
     for (let i = 0; i < tracks.length; i += 1) {
-      const item = tracks[i];
-      if (!item.track || item.is_local || item.track.type === "episode") continue;
+      totalItems += 1;
+      const row = tracks[i];
+      const track = row.track ?? row.item ?? null;
+      if (!track) {
+        nullTrackItems += 1;
+        continue;
+      }
+      if (row.is_local) {
+        localItems += 1;
+        continue;
+      }
+      if (track.type === "episode") continue;
 
-      const spotifyTrackId = item.track.id ?? item.track.uri ?? null;
-      if (!spotifyTrackId) continue;
+      const fromUrl = track.external_urls?.spotify?.match(/\/track\/([A-Za-z0-9]+)/)?.[1] ?? null;
+      const spotifyTrackId = track.id ?? track.uri ?? fromUrl ?? null;
+      if (!spotifyTrackId) {
+        skippedNoId += 1;
+        continue;
+      }
 
       const insertedTrack = await db.query<{ id: string }>(
         `INSERT INTO imported_playlist_tracks
@@ -378,12 +407,12 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
         [
           importedPlaylistId,
           spotifyTrackId,
-          item.track.uri ?? "",
-          item.track.name ?? "Sem título",
-          JSON.stringify((item.track.artists ?? []).map((a) => a.name)),
-          item.track.album?.name ?? null,
-          item.track.duration_ms ?? 0,
-          item.track.preview_url ?? null,
+          track.uri ?? "",
+          track.name ?? "Sem título",
+          JSON.stringify((track.artists ?? []).map((a) => a.name)),
+          track.album?.name ?? null,
+          track.duration_ms ?? 0,
+          track.preview_url ?? null,
           i,
         ],
       );
@@ -397,10 +426,10 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
           insertedTrack.rows[0].id,
           defaultMomentId,
           nextOrder,
-          item.track.uri ?? null,
-          item.track.external_urls?.spotify ?? null,
-          item.track.name ?? "Sem título",
-          JSON.stringify((item.track.artists ?? []).map((a) => a.name)),
+          track.uri ?? null,
+          track.external_urls?.spotify ?? null,
+          track.name ?? "Sem título",
+          JSON.stringify((track.artists ?? []).map((a) => a.name)),
         ],
       );
       nextOrder += 1;
@@ -409,7 +438,7 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
 
     if (importedCount === 0) {
       throw new Error(
-        "A playlist foi lida, mas nenhuma faixa importável foi encontrada (faixas locais/indisponíveis).",
+        `A playlist foi lida, mas nenhuma faixa importável foi encontrada. total=${totalItems}, sem_track=${nullTrackItems}, locais=${localItems}, sem_id=${skippedNoId}`,
       );
     }
 
