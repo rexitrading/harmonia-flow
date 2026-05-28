@@ -72,13 +72,13 @@ async function fetchPlaylistItems(
   accessToken: string,
   playlistId: string,
 ): Promise<SpotifyPlaylistItem[]> {
-  async function fetchFrom(pathBase: string) {
+  async function fetchFrom(pathBaseWithQuery: string) {
     const all: SpotifyPlaylistItem[] = [];
     let offset = 0;
     const limit = 100;
     while (true) {
       const page = await spotifyGet<{ items: SpotifyPlaylistItem[]; next: string | null }>(
-        `${pathBase}?limit=${limit}&offset=${offset}`,
+        `${pathBaseWithQuery}&limit=${limit}&offset=${offset}`,
         accessToken,
       );
       all.push(...(page.items ?? []));
@@ -88,15 +88,8 @@ async function fetchPlaylistItems(
     return all;
   }
 
-  const baseItems = `/playlists/${playlistId}/items`;
-  const baseTracks = `/playlists/${playlistId}/tracks`;
-
-  const items = await fetchFrom(baseItems);
-  const validItems = items.filter((i) => i.track && !i.is_local);
-  if (validItems.length > 0) return items;
-
-  // Fallback for edge cases where /items returns only null/unavailable wrappers.
-  return fetchFrom(baseTracks);
+  const baseItems = `/playlists/${playlistId}/items?market=from_token&additional_types=track`;
+  return fetchFrom(baseItems);
 }
 
 async function fetchPlaylistMetaFromMe(
