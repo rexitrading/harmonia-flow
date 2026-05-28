@@ -9,9 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SessoesRouteImport } from './routes/sessoes'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SessoesIdRouteImport } from './routes/sessoes.$id'
 
+const SessoesRoute = SessoesRouteImport.update({
+  id: '/sessoes',
+  path: '/sessoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -22,35 +29,54 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SessoesIdRoute = SessoesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SessoesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/sessoes': typeof SessoesRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/sessoes': typeof SessoesRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/sessoes': typeof SessoesRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login'
+  fullPaths: '/' | '/login' | '/sessoes' | '/sessoes/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login'
-  id: '__root__' | '/' | '/login'
+  to: '/' | '/login' | '/sessoes' | '/sessoes/$id'
+  id: '__root__' | '/' | '/login' | '/sessoes' | '/sessoes/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  SessoesRoute: typeof SessoesRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sessoes': {
+      id: '/sessoes'
+      path: '/sessoes'
+      fullPath: '/sessoes'
+      preLoaderRoute: typeof SessoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -65,12 +91,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sessoes/$id': {
+      id: '/sessoes/$id'
+      path: '/$id'
+      fullPath: '/sessoes/$id'
+      preLoaderRoute: typeof SessoesIdRouteImport
+      parentRoute: typeof SessoesRoute
+    }
   }
 }
+
+interface SessoesRouteChildren {
+  SessoesIdRoute: typeof SessoesIdRoute
+}
+
+const SessoesRouteChildren: SessoesRouteChildren = {
+  SessoesIdRoute: SessoesIdRoute,
+}
+
+const SessoesRouteWithChildren =
+  SessoesRoute._addFileChildren(SessoesRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  SessoesRoute: SessoesRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
