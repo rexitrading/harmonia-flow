@@ -14,7 +14,136 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      faixas: {
+        Row: {
+          artista: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          momento_id: string
+          ordem: number
+          spotify_url: string
+          titulo: string
+        }
+        Insert: {
+          artista?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          momento_id: string
+          ordem?: number
+          spotify_url: string
+          titulo: string
+        }
+        Update: {
+          artista?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          momento_id?: string
+          ordem?: number
+          spotify_url?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faixas_momento_id_fkey"
+            columns: ["momento_id"]
+            isOneToOne: false
+            referencedRelation: "momentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      momentos: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          ordem: number
+          sessao_id: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          sessao_id: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          sessao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "momentos_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "sessoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      sessoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_sessao: string
+          grau: string
+          id: string
+          observacoes: string | null
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_sessao: string
+          grau?: string
+          id?: string
+          observacoes?: string | null
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_sessao?: string
+          grau?: string
+          id?: string
+          observacoes?: string | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
