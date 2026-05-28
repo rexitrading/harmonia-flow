@@ -24,6 +24,5 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 3000
 
-# TanStack Start + current build output: run dev server in container for MVP deployment.
-# Replace with dedicated production start command once runtime target is stabilized.
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+# Serve built app in production mode behind reverse proxy.
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
