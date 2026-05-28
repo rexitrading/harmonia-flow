@@ -31,6 +31,7 @@ import {
   spotifyPausePlayback,
   spotifyPlayTrack,
   startSpotifyConnection,
+  updateEventTrack,
 } from "@/lib/api/harmonia.functions";
 
 export const Route = createFileRoute("/sessoes/$id")({
@@ -235,6 +236,43 @@ function SessaoDetail() {
     }
   }
 
+  async function handleChangeTrackMoment(trackId: string, momentId: string) {
+    try {
+      await updateEventTrack({ data: { trackId, momentId } });
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao mover faixa");
+    }
+  }
+
+  async function handleChangeTrackNote(trackId: string, note: string) {
+    try {
+      await updateEventTrack({ data: { trackId, note } });
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao atualizar observação");
+    }
+  }
+
+  async function handleMoveTrackWithinMoment(trackId: string, momentId: string, direction: "up" | "down") {
+    const list = faixas.filter((f) => f.moment_id === momentId).sort((a, b) => a.order_index - b.order_index);
+    const currentIndex = list.findIndex((f) => f.id === trackId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+
+    const current = list[currentIndex];
+    const target = list[targetIndex];
+
+    try {
+      await updateEventTrack({ data: { trackId: current.id, orderIndex: target.order_index } });
+      await updateEventTrack({ data: { trackId: target.id, orderIndex: current.order_index } });
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reordenar faixa");
+    }
+  }
+
   if (loading || !user || !sessao) return <div className="min-h-screen bg-background" />;
 
   return (
@@ -391,6 +429,45 @@ function SessaoDetail() {
                           Tocar completo
                         </Button>
                       </div>
+                      <div className="mb-3 grid gap-2 md:grid-cols-2">
+                        <select
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                          value={f.moment_id}
+                          onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}
+                        >
+                          {momentos.map((mom) => (
+                            <option key={mom.id} value={mom.id}>
+                              {mom.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}
+                          >
+                            Subir
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}
+                          >
+                            Descer
+                          </Button>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={f.note ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFaixas((prev) => prev.map((t) => (t.id === f.id ? { ...t, note: val } : t)));
+                        }}
+                        onBlur={(e) => handleChangeTrackNote(f.id, e.target.value)}
+                        placeholder="Observação da faixa neste momento"
+                        className="mb-3"
+                      />
                       {f.spotify_url && <SpotifyEmbed url={f.spotify_url} />}
                     </div>
                   ))}

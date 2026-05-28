@@ -654,3 +654,39 @@ export const removeTrack = createServerFn({ method: "POST" })
     await db.query("DELETE FROM event_tracks WHERE id = $1", [data.trackId]);
     return { ok: true };
   });
+
+export const updateEventTrack = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      trackId: z.string().uuid(),
+      momentId: z.string().uuid().nullable().optional(),
+      note: z.string().nullable().optional(),
+      orderIndex: z.number().int().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    const ownership = await db.query(
+      `SELECT et.id
+       FROM event_tracks et
+       JOIN events e ON e.id = et.event_id
+       WHERE et.id = $1 AND e.owner_user_id = $2`,
+      [data.trackId, userId],
+    );
+    if (!ownership.rows[0]) throw new Error("Faixa não encontrada");
+
+    await db.query(
+      `UPDATE event_tracks
+       SET moment_id = COALESCE($2, moment_id),
+           note = COALESCE($3, note),
+           order_index = COALESCE($4, order_index),
+           updated_at = now()
+       WHERE id = $1`,
+      [data.trackId, data.momentId ?? null, data.note ?? null, data.orderIndex ?? null],
+    );
+
+    return { ok: true };
+  });
