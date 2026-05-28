@@ -445,6 +445,59 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
     return { ok: true, imported_count: importedCount };
   });
 
+export const getSpotifyDevices = createServerFn({ method: "GET" }).handler(async () => {
+  const { spotifyGet } = await import("@/lib/spotify.server");
+  const session = await useAppSession();
+  const userId = requireUser(session);
+  const { accessToken } = await getValidSpotifyAccessToken(userId);
+
+  const data = await spotifyGet<{
+    devices: Array<{
+      id: string | null;
+      is_active: boolean;
+      is_private_session: boolean;
+      is_restricted: boolean;
+      name: string;
+      type: string;
+      volume_percent: number | null;
+    }>;
+  }>("/me/player/devices", accessToken);
+
+  return data.devices.filter((d) => !!d.id && !d.is_restricted);
+});
+
+export const spotifyPlayTrack = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ trackUri: z.string().min(1), deviceId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const { spotifyPut } = await import("@/lib/spotify.server");
+    const session = await useAppSession();
+    const userId = requireUser(session);
+    const { accessToken } = await getValidSpotifyAccessToken(userId);
+
+    await spotifyPut(`/me/player?device_id=${encodeURIComponent(data.deviceId)}`, accessToken, {
+      device_ids: [data.deviceId],
+      play: false,
+    });
+    await spotifyPut(
+      `/me/player/play?device_id=${encodeURIComponent(data.deviceId)}`,
+      accessToken,
+      { uris: [data.trackUri] },
+    );
+    return { ok: true };
+  });
+
+export const spotifyPausePlayback = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ deviceId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const { spotifyPut } = await import("@/lib/spotify.server");
+    const session = await useAppSession();
+    const userId = requireUser(session);
+    const { accessToken } = await getValidSpotifyAccessToken(userId);
+
+    await spotifyPut(`/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`, accessToken);
+    return { ok: true };
+  });
+
 export const listEvents = createServerFn({ method: "GET" }).handler(async () => {
   const db = getDb();
   const session = await useAppSession();
@@ -511,7 +564,7 @@ export const getEventDetail = createServerFn({ method: "GET" })
     );
 
     const tracks = await db.query(
-      `SELECT id, moment_id, order_index, track_name, artists_json, spotify_url, note
+      `SELECT id, moment_id, order_index, track_name, artists_json, spotify_url, spotify_uri, note
        FROM event_tracks
        WHERE event_id = $1
        ORDER BY order_index ASC`,

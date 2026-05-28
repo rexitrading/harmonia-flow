@@ -22,11 +22,14 @@ import {
   addMoment,
   addTrack,
   getSpotifyConnectionStatus,
+  getSpotifyDevices,
   getEventDetail,
   importPlaylistToEvent,
   listSpotifyPlaylists,
   removeMoment,
   removeTrack,
+  spotifyPausePlayback,
+  spotifyPlayTrack,
   startSpotifyConnection,
 } from "@/lib/api/harmonia.functions";
 
@@ -50,6 +53,7 @@ type Faixa = {
   track_name: string;
   artists_json: string[];
   spotify_url: string | null;
+  spotify_uri: string | null;
   note: string | null;
   order_index: number;
 };
@@ -76,6 +80,10 @@ function SessaoDetail() {
     Array<{ id: string; name: string; tracks: { total: number } }>
   >([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
+  const [devices, setDevices] = useState<
+    Array<{ id: string; name: string; type: string; is_active: boolean }>
+  >([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
@@ -108,12 +116,21 @@ function SessaoDetail() {
       if (status.connected) {
         const pls = await listSpotifyPlaylists();
         setPlaylists(pls as Array<{ id: string; name: string; tracks: { total: number } }>);
+        const devs = await getSpotifyDevices();
+        const typed = devs as Array<{ id: string; name: string; type: string; is_active: boolean }>;
+        setDevices(typed);
+        const active = typed.find((d) => d.is_active)?.id ?? "";
+        setSelectedDeviceId((prev) => prev || active);
       } else {
         setPlaylists([]);
+        setDevices([]);
+        setSelectedDeviceId("");
       }
     } catch {
       setSpotifyConnected(false);
       setPlaylists([]);
+      setDevices([]);
+      setSelectedDeviceId("");
     }
   }
 
@@ -188,6 +205,36 @@ function SessaoDetail() {
     await load();
   }
 
+  async function handlePlayTrack(trackUri: string | null) {
+    if (!selectedDeviceId) {
+      toast.error("Selecione um device Spotify para reprodução.");
+      return;
+    }
+    if (!trackUri) {
+      toast.error("Faixa sem URI Spotify.");
+      return;
+    }
+    try {
+      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri } });
+      toast.success("Reprodução iniciada");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reproduzir faixa");
+    }
+  }
+
+  async function handlePausePlayback() {
+    if (!selectedDeviceId) {
+      toast.error("Selecione um device Spotify para reprodução.");
+      return;
+    }
+    try {
+      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId } });
+      toast.success("Reprodução pausada");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao pausar reprodução");
+    }
+  }
+
   if (loading || !user || !sessao) return <div className="min-h-screen bg-background" />;
 
   return (
@@ -222,22 +269,41 @@ function SessaoDetail() {
               Conectar Spotify
             </Button>
           ) : (
-            <div className="mt-4 flex flex-col gap-3 md:flex-row">
-              <select
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                value={selectedPlaylistId}
-                onChange={(e) => setSelectedPlaylistId(e.target.value)}
-              >
-                <option value="">Selecione uma playlist</option>
-                {playlists.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.tracks?.total ?? 0} faixas)
-                  </option>
-                ))}
-              </select>
-              <Button onClick={handleImportPlaylist} disabled={!selectedPlaylistId}>
-                Importar para esta sessão
-              </Button>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-col gap-3 md:flex-row">
+                <select
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={selectedPlaylistId}
+                  onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                >
+                  <option value="">Selecione uma playlist</option>
+                  {playlists.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.tracks?.total ?? 0} faixas)
+                    </option>
+                  ))}
+                </select>
+                <Button onClick={handleImportPlaylist} disabled={!selectedPlaylistId}>
+                  Importar para esta sessão
+                </Button>
+              </div>
+              <div className="flex flex-col gap-3 md:flex-row">
+                <select
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={selectedDeviceId}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                >
+                  <option value="">Selecione um device Spotify</option>
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.type}) {d.is_active ? "- ativo" : ""}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" onClick={handlePausePlayback} disabled={!selectedDeviceId}>
+                  Pause
+                </Button>
+              </div>
             </div>
           )}
         </section>
@@ -319,6 +385,11 @@ function SessaoDetail() {
                         <button onClick={() => handleRemoveFaixa(f.id)} aria-label="Excluir música">
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                         </button>
+                      </div>
+                      <div className="mb-3">
+                        <Button size="sm" onClick={() => handlePlayTrack(f.spotify_uri)}>
+                          Tocar completo
+                        </Button>
                       </div>
                       {f.spotify_url && <SpotifyEmbed url={f.spotify_url} />}
                     </div>

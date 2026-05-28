@@ -108,3 +108,24 @@ export async function spotifyGet<T>(path: string, accessToken: string): Promise<
   }
   return (await res.json()) as T;
 }
+
+export async function spotifyPut(path: string, accessToken: string, body?: unknown): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const payload = (await res.json()) as { error?: { message?: string } };
+      detail = payload?.error?.message ? `: ${payload.error.message}` : "";
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(`Spotify API request failed (${res.status}) on ${path}${detail}`);
+  }
+}
