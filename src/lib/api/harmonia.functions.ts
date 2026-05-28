@@ -18,6 +18,21 @@ type SpotifyAccountRow = {
   token_expires_at: string;
 };
 
+type SpotifyPlaylistItem = {
+  is_local?: boolean;
+  track?: {
+    id?: string | null;
+    uri?: string | null;
+    name?: string;
+    artists?: Array<{ name: string }>;
+    album?: { name: string };
+    duration_ms?: number;
+    preview_url?: string | null;
+    external_urls?: { spotify?: string } | null;
+    type?: string;
+  } | null;
+};
+
 function requireUser(session: { data: { userId?: string } }) {
   if (!session.data.userId) throw new Error("Unauthorized");
   return session.data.userId;
@@ -50,6 +65,38 @@ async function getValidSpotifyAccessToken(userId: string) {
   );
 
   return { accountId: account.id, accessToken: refreshed.access_token };
+}
+
+async function fetchPlaylistItems(
+  spotifyGet: <T>(path: string, accessToken: string) => Promise<T>,
+  accessToken: string,
+  playlistId: string,
+): Promise<SpotifyPlaylistItem[]> {
+  async function fetchFrom(pathBase: string) {
+    const all: SpotifyPlaylistItem[] = [];
+    let offset = 0;
+    const limit = 100;
+    while (true) {
+      const page = await spotifyGet<{ items: SpotifyPlaylistItem[]; next: string | null }>(
+        `${pathBase}?limit=${limit}&offset=${offset}`,
+        accessToken,
+      );
+      all.push(...(page.items ?? []));
+      if (!page.next) break;
+      offset += limit;
+    }
+    return all;
+  }
+
+  const baseItems = `/playlists/${playlistId}/items`;
+  const baseTracks = `/playlists/${playlistId}/tracks`;
+
+  const items = await fetchFrom(baseItems);
+  const validItems = items.filter((i) => i.track && !i.is_local);
+  if (validItems.length > 0) return items;
+
+  // Fallback for edge cases where /items returns only null/unavailable wrappers.
+  return fetchFrom(baseTracks);
 }
 
 export const authSignUp = createServerFn({ method: "POST" })
@@ -247,24 +294,7 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
       owner: { display_name: string };
     }>(`/playlists/${data.spotify_playlist_id}`, accessToken);
 
-    const tracks = await spotifyGet<{
-      items: Array<{
-        is_local?: boolean;
-        track: {
-          id: string | null;
-          uri: string | null;
-          name: string;
-          artists: Array<{ name: string }>;
-          album: { name: string };
-          duration_ms: number;
-          preview_url: string | null;
-          external_urls: { spotify: string } | null;
-        } | null;
-      }>;
-    }>(
-      `/playlists/${data.spotify_playlist_id}/items?limit=100&market=from_token&additional_types=track`,
-      accessToken,
-    );
+    const tracks = await fetchPlaylistItems(spotifyGet, accessToken, data.spotify_playlist_id);
 
     const importedPlaylist = await db.query<{ id: string }>(
       `INSERT INTO imported_playlists
@@ -315,9 +345,9 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
     let nextOrder = orderRes.rows[0].value;
 
     let importedCount = 0;
-    for (let i = 0; i < tracks.items.length; i += 1) {
-      const item = tracks.items[i];
-      if (!item.track || item.is_local) continue;
+    for (let i = 0; i < tracks.length; i += 1) {
+      const item = tracks[i];
+      if (!item.track || item.is_local || item.track.type === "episode") continue;
 
       const spotifyTrackId = item.track.id ?? item.track.uri ?? null;
       if (!spotifyTrackId) continue;
@@ -331,11 +361,11 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
           importedPlaylistId,
           spotifyTrackId,
           item.track.uri ?? "",
-          item.track.name,
-          JSON.stringify(item.track.artists.map((a) => a.name)),
+          item.track.name ?? "Sem título",
+          JSON.stringify((item.track.artists ?? []).map((a) => a.name)),
           item.track.album?.name ?? null,
-          item.track.duration_ms,
-          item.track.preview_url,
+          item.track.duration_ms ?? 0,
+          item.track.preview_url ?? null,
           i,
         ],
       );
@@ -351,8 +381,8 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
           nextOrder,
           item.track.uri ?? null,
           item.track.external_urls?.spotify ?? null,
-          item.track.name,
-          JSON.stringify(item.track.artists.map((a) => a.name)),
+          item.track.name ?? "Sem título",
+          JSON.stringify((item.track.artists ?? []).map((a) => a.name)),
         ],
       );
       nextOrder += 1;
