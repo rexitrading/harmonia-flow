@@ -288,6 +288,21 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
     await db.query("DELETE FROM imported_playlist_tracks WHERE imported_playlist_id = $1", [
       importedPlaylistId,
     ]);
+    let firstMomentRes = await db.query<{ id: string }>(
+      "SELECT id FROM moments WHERE event_id = $1 ORDER BY order_index ASC LIMIT 1",
+      [data.eventId],
+    );
+    if (!firstMomentRes.rows[0]) {
+      await db.query("INSERT INTO moments (event_id, name, order_index) VALUES ($1, $2, 0)", [
+        data.eventId,
+        "Importadas",
+      ]);
+      firstMomentRes = await db.query<{ id: string }>(
+        "SELECT id FROM moments WHERE event_id = $1 ORDER BY order_index ASC LIMIT 1",
+        [data.eventId],
+      );
+    }
+    const defaultMomentId = firstMomentRes.rows[0].id;
 
     const orderRes = await db.query<{ value: number }>(
       "SELECT COALESCE(MAX(order_index), -1) + 1 AS value FROM event_tracks WHERE event_id = $1",
@@ -319,11 +334,12 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
 
       await db.query(
         `INSERT INTO event_tracks
-        (event_id, imported_playlist_track_id, order_index, display_order, spotify_uri, spotify_url, track_name, artists_json)
-        VALUES ($1, $2, $3, $3, $4, $5, $6, $7::jsonb)`,
+        (event_id, imported_playlist_track_id, moment_id, order_index, display_order, spotify_uri, spotify_url, track_name, artists_json)
+        VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8::jsonb)`,
         [
           data.eventId,
           insertedTrack.rows[0].id,
+          defaultMomentId,
           nextOrder,
           item.track.uri,
           item.track.external_urls?.spotify ?? null,
