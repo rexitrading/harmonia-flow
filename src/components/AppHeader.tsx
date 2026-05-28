@@ -1,14 +1,16 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { authSignOut } from "@/lib/api/harmonia.functions";
 
 export function AppHeader() {
   const navigate = useNavigate();
+
   async function logout() {
-    await supabase.auth.signOut();
+    await authSignOut();
     navigate({ to: "/" });
   }
+
   return (
     <header className="border-b border-border bg-card/40 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">

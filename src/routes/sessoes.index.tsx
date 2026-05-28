@@ -1,17 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Plus, Calendar, Trash2 } from "lucide-react";
-import { PRESETS } from "@/lib/preset-momentos";
 import { toast } from "sonner";
+import { createEvent, deleteEvent, listEvents } from "@/lib/api/harmonia.functions";
 
 export const Route = createFileRoute("/sessoes/")({
   head: () => ({ meta: [{ title: "Sessões — Harmonia" }] }),
@@ -19,7 +24,12 @@ export const Route = createFileRoute("/sessoes/")({
 });
 
 type Sessao = {
-  id: string; titulo: string; data_sessao: string; tipo: string; grau: string; observacoes: string | null;
+  id: string;
+  title: string;
+  event_date: string;
+  location: string | null;
+  notes: string | null;
+  status: "draft" | "ready" | "live" | "finished" | "archived";
 };
 
 function SessoesPage() {
@@ -27,39 +37,59 @@ function SessoesPage() {
   const navigate = useNavigate();
   const [sessoes, setSessoes] = useState<Sessao[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ titulo: "", data_sessao: new Date().toISOString().slice(0, 10), tipo: "Ordinária", grau: "Aprendiz", observacoes: "", popular: true });
+  const [form, setForm] = useState({
+    title: "",
+    event_date: new Date().toISOString().slice(0, 16),
+    location: "",
+    notes: "",
+  });
 
-  useEffect(() => { if (!loading && !user) navigate({ to: "/login" }); }, [loading, user, navigate]);
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => {
+    if (!loading && !user) navigate({ to: "/login" });
+  }, [loading, user, navigate]);
+
+  useEffect(() => {
+    if (user) load();
+  }, [user]);
 
   async function load() {
-    const { data, error } = await supabase.from("sessoes").select("*").order("data_sessao", { ascending: false });
-    if (error) toast.error(error.message); else setSessoes(data ?? []);
+    try {
+      const data = await listEvents();
+      setSessoes(data as Sessao[]);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao carregar eventos");
+    }
   }
 
   async function create() {
-    if (!user) return;
-    const { data, error } = await supabase.from("sessoes").insert({
-      titulo: form.titulo, data_sessao: form.data_sessao, tipo: form.tipo, grau: form.grau,
-      observacoes: form.observacoes || null, created_by: user.id,
-    }).select().single();
-    if (error) { toast.error(error.message); return; }
-    if (form.popular && data) {
-      const presets = PRESETS[form.grau] ?? [];
-      const rows = presets.map((p, i) => ({ sessao_id: data.id, ordem: i, nome: p.nome, descricao: p.descricao }));
-      if (rows.length) await supabase.from("momentos").insert(rows);
+    try {
+      const response = await createEvent({
+        data: {
+          title: form.title,
+          event_date: new Date(form.event_date).toISOString(),
+          location: form.location || undefined,
+          notes: form.notes || undefined,
+        },
+      });
+      toast.success("Sessão criada");
+      setOpen(false);
+      setForm({ ...form, title: "", notes: "" });
+      await load();
+      navigate({ to: "/sessoes/$id", params: { id: response.id } });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao criar sessão");
     }
-    toast.success("Sessão criada");
-    setOpen(false);
-    setForm({ ...form, titulo: "", observacoes: "" });
-    load();
-    if (data) navigate({ to: "/sessoes/$id", params: { id: data.id } });
   }
 
   async function remove(id: string) {
     if (!confirm("Excluir esta sessão?")) return;
-    const { error } = await supabase.from("sessoes").delete().eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Excluída"); load(); }
+    try {
+      await deleteEvent({ data: { id } });
+      toast.success("Excluída");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir");
+    }
   }
 
   if (loading || !user) return <div className="min-h-screen bg-background" />;
@@ -70,62 +100,58 @@ function SessoesPage() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 flex items-end justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Quadro da Harmonia</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Quadro da Harmonia
+            </p>
             <h1 className="mt-1 font-display text-4xl">Sessões</h1>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" />Nova Sessão</Button>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Sessão
+              </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle className="font-display text-2xl">Nova Sessão</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle className="font-display text-2xl">Nova Sessão</DialogTitle>
+              </DialogHeader>
               <div className="space-y-4">
                 <div>
                   <Label>Título</Label>
-                  <Input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Ex: Sessão de Iniciação" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Data</Label>
-                    <Input type="date" value={form.data_sessao} onChange={(e) => setForm({ ...form, data_sessao: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Tipo</Label>
-                    <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ordinária">Ordinária</SelectItem>
-                        <SelectItem value="Branca">Branca</SelectItem>
-                        <SelectItem value="Magna">Magna</SelectItem>
-                        <SelectItem value="Iniciação">Iniciação</SelectItem>
-                        <SelectItem value="Elevação">Elevação</SelectItem>
-                        <SelectItem value="Exaltação">Exaltação</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Input
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="Ex: Sessão de Iniciação"
+                  />
                 </div>
                 <div>
-                  <Label>Grau</Label>
-                  <Select value={form.grau} onValueChange={(v) => setForm({ ...form, grau: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Aprendiz">Aprendiz</SelectItem>
-                      <SelectItem value="Companheiro">Companheiro</SelectItem>
-                      <SelectItem value="Mestre">Mestre</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Data e hora</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.event_date}
+                    onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Local</Label>
+                  <Input
+                    value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>Observações</Label>
-                  <Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+                  <Textarea
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  />
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.popular} onChange={(e) => setForm({ ...form, popular: e.target.checked })} />
-                  Popular com momentos ritualísticos do grau
-                </label>
               </div>
               <DialogFooter>
-                <Button onClick={create} disabled={!form.titulo}>Criar</Button>
+                <Button onClick={create} disabled={!form.title}>
+                  Criar
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -139,18 +165,21 @@ function SessoesPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {sessoes.map((s) => (
-              <div key={s.id} className="group relative rounded-lg border border-border bg-card p-5 transition hover:border-accent">
+              <div
+                key={s.id}
+                className="group relative rounded-lg border border-border bg-card p-5 transition hover:border-accent"
+              >
                 <Link to="/sessoes/$id" params={{ id: s.id }} className="block">
                   <div className="flex items-start justify-between gap-2">
                     <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-foreground">
-                      {s.grau}
+                      {s.status}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(s.data_sessao + "T12:00").toLocaleDateString("pt-BR")}
+                      {new Date(s.event_date).toLocaleDateString("pt-BR")}
                     </span>
                   </div>
-                  <h3 className="mt-3 font-display text-xl">{s.titulo}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{s.tipo}</p>
+                  <h3 className="mt-3 font-display text-xl">{s.title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">{s.location || "Sem local"}</p>
                 </Link>
                 <button
                   onClick={() => remove(s.id)}

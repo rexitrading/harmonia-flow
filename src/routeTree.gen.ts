@@ -14,6 +14,7 @@ import { Route as SessoesRouteRouteImport } from './routes/sessoes.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessoesIndexRouteImport } from './routes/sessoes.index'
 import { Route as SessoesIdRouteImport } from './routes/sessoes.$id'
+import { Route as AuthSpotifyCallbackRouteImport } from './routes/auth.spotify.callback'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -40,6 +41,11 @@ const SessoesIdRoute = SessoesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => SessoesRouteRoute,
 } as any)
+const AuthSpotifyCallbackRoute = AuthSpotifyCallbackRouteImport.update({
+  id: '/auth/spotify/callback',
+  path: '/auth/spotify/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,12 +53,14 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
+  '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes': typeof SessoesIndexRoute
+  '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -61,19 +69,34 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
+  '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sessoes' | '/login' | '/sessoes/$id' | '/sessoes/'
+  fullPaths:
+    | '/'
+    | '/sessoes'
+    | '/login'
+    | '/sessoes/$id'
+    | '/sessoes/'
+    | '/auth/spotify/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/sessoes/$id' | '/sessoes'
-  id: '__root__' | '/' | '/sessoes' | '/login' | '/sessoes/$id' | '/sessoes/'
+  to: '/' | '/login' | '/sessoes/$id' | '/sessoes' | '/auth/spotify/callback'
+  id:
+    | '__root__'
+    | '/'
+    | '/sessoes'
+    | '/login'
+    | '/sessoes/$id'
+    | '/sessoes/'
+    | '/auth/spotify/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SessoesRouteRoute: typeof SessoesRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  AuthSpotifyCallbackRoute: typeof AuthSpotifyCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -113,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessoesIdRouteImport
       parentRoute: typeof SessoesRouteRoute
     }
+    '/auth/spotify/callback': {
+      id: '/auth/spotify/callback'
+      path: '/auth/spotify/callback'
+      fullPath: '/auth/spotify/callback'
+      preLoaderRoute: typeof AuthSpotifyCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -134,7 +164,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SessoesRouteRoute: SessoesRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  AuthSpotifyCallbackRoute: AuthSpotifyCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
