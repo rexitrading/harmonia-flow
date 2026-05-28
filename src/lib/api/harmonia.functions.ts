@@ -78,7 +78,7 @@ export const authSignUp = createServerFn({ method: "POST" })
     );
     const user = result.rows[0];
 
-    session.update({ userId: user.id, email: user.email, name: user.name });
+    await session.update({ userId: user.id, email: user.email, name: user.name });
     return { user };
   });
 
@@ -99,13 +99,13 @@ export const authSignIn = createServerFn({ method: "POST" })
     const ok = await bcrypt.compare(data.password, user.password_hash);
     if (!ok) throw new Error("Credenciais inválidas");
 
-    session.update({ userId: user.id, email: user.email, name: user.name });
+    await session.update({ userId: user.id, email: user.email, name: user.name });
     return { user: { id: user.id, name: user.name, email: user.email, role: user.role } };
   });
 
 export const authSignOut = createServerFn({ method: "POST" }).handler(async () => {
   const session = await useAppSession();
-  session.clear();
+  await session.clear();
   return { ok: true };
 });
 
@@ -125,7 +125,7 @@ export const startSpotifyConnection = createServerFn({ method: "POST" }).handler
   requireUser(session);
 
   const state = generateState();
-  session.update({ ...session.data, spotifyState: state });
+  await session.update({ ...session.data, spotifyState: state });
 
   const scope = [
     "user-read-email",
@@ -181,7 +181,7 @@ export const finalizeSpotifyConnection = createServerFn({ method: "POST" })
       ],
     );
 
-    session.update({ ...session.data, spotifyState: undefined });
+    await session.update({ ...session.data, spotifyState: undefined });
     return { ok: true };
   });
 
