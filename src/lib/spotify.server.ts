@@ -96,6 +96,15 @@ export async function spotifyGet<T>(path: string, accessToken: string): Promise<
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`Spotify API request failed (${res.status})`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = (await res.json()) as { error?: { message?: string } };
+      detail = body?.error?.message ? `: ${body.error.message}` : "";
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(`Spotify API request failed (${res.status})${detail}`);
+  }
   return (await res.json()) as T;
 }

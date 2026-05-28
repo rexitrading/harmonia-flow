@@ -3,13 +3,6 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/lib/db.server";
 import { useAppSession } from "@/lib/session.server";
-import {
-  exchangeCodeForToken,
-  generateState,
-  getSpotifyAuthorizeUrl,
-  refreshAccessToken,
-  spotifyGet,
-} from "@/lib/spotify.server";
 
 type UserRow = {
   id: string;
@@ -31,6 +24,7 @@ function requireUser(session: { data: { userId?: string } }) {
 }
 
 async function getValidSpotifyAccessToken(userId: string) {
+  const { refreshAccessToken } = await import("@/lib/spotify.server");
   const db = getDb();
   const accountRes = await db.query<SpotifyAccountRow>(
     "SELECT id, access_token, refresh_token, token_expires_at FROM spotify_accounts WHERE user_id = $1",
@@ -121,6 +115,7 @@ export const authMe = createServerFn({ method: "GET" }).handler(async () => {
 });
 
 export const startSpotifyConnection = createServerFn({ method: "POST" }).handler(async () => {
+  const { generateState, getSpotifyAuthorizeUrl } = await import("@/lib/spotify.server");
   const session = await useAppSession();
   requireUser(session);
 
@@ -142,6 +137,7 @@ export const startSpotifyConnection = createServerFn({ method: "POST" }).handler
 export const finalizeSpotifyConnection = createServerFn({ method: "POST" })
   .inputValidator(z.object({ code: z.string().min(1), state: z.string().min(1) }))
   .handler(async ({ data }) => {
+    const { exchangeCodeForToken, spotifyGet } = await import("@/lib/spotify.server");
     const db = getDb();
     const session = await useAppSession();
     const userId = requireUser(session);
@@ -199,27 +195,39 @@ export const getSpotifyConnectionStatus = createServerFn({ method: "GET" }).hand
 });
 
 export const listSpotifyPlaylists = createServerFn({ method: "GET" }).handler(async () => {
+  const { spotifyGet } = await import("@/lib/spotify.server");
   const session = await useAppSession();
   const userId = requireUser(session);
   const { accessToken } = await getValidSpotifyAccessToken(userId);
 
+  const me = await spotifyGet<{ id: string }>("/me", accessToken);
   const data = await spotifyGet<{
     items: Array<{
       id: string;
       name: string;
+      collaborative: boolean;
       snapshot_id: string;
       images: Array<{ url: string }>;
-      owner: { display_name: string };
+      owner: { id: string; display_name: string };
       tracks: { total: number };
     }>;
   }>("/me/playlists?limit=50", accessToken);
 
-  return data.items;
+  return data.items
+    .filter((p) => p.owner?.id === me.id || p.collaborative)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      tracks: p.tracks,
+      owner: p.owner?.display_name ?? null,
+      collaborative: p.collaborative,
+    }));
 });
 
 export const importPlaylistToEvent = createServerFn({ method: "POST" })
   .inputValidator(z.object({ eventId: z.string().uuid(), spotify_playlist_id: z.string().min(5) }))
   .handler(async ({ data }) => {
+    const { spotifyGet } = await import("@/lib/spotify.server");
     const db = getDb();
     const session = await useAppSession();
     const userId = requireUser(session);
@@ -252,7 +260,7 @@ export const importPlaylistToEvent = createServerFn({ method: "POST" })
           external_urls: { spotify: string };
         } | null;
       }>;
-    }>(`/playlists/${data.spotify_playlist_id}/tracks?limit=100`, accessToken);
+    }>(`/playlists/${data.spotify_playlist_id}/items?limit=100&market=from_token`, accessToken);
 
     const importedPlaylist = await db.query<{ id: string }>(
       `INSERT INTO imported_playlists
