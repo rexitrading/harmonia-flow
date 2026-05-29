@@ -390,11 +390,7 @@ function ExecutarPage() {
               })}
             </div>
 
-            <div
-              className={`flex-shrink-0 border-t border-border/60 bg-gradient-to-t from-background via-background to-transparent ${
-                condutorMode ? "pt-6 pb-6 mt-4" : "pt-5 pb-3 mt-4"
-              }`}
-            >
+            <div className="mt-4 flex-shrink-0 border-t border-border/60 bg-gradient-to-t from-background via-background to-transparent pt-5 pb-3">
               <div className="flex items-center justify-center gap-8">
                 <button
                   onClick={goPrev}
