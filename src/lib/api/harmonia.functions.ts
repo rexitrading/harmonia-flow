@@ -107,6 +107,12 @@ async function getPlaybackToken(eventId: string, userId: string) {
   }
 }
 
+function isSpotifyDeviceNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes("(404)") && msg.includes("device not found");
+}
+
 async function fetchPlaylistItems(
   spotifyGet: <T>(path: string, accessToken: string) => Promise<T>,
   accessToken: string,
@@ -566,17 +572,21 @@ export const spotifyPlayTrack = createServerFn({ method: "POST" })
       : await getValidSpotifyAccessToken(userId);
 
     if (data.deviceId) {
-      await spotifyPut(`/me/player`, accessToken, {
-        device_ids: [data.deviceId],
-        play: false,
-      });
+      try {
+        await spotifyPut(`/me/player`, accessToken, {
+          device_ids: [data.deviceId],
+          play: false,
+        });
+        await spotifyPut(`/me/player/play?device_id=${encodeURIComponent(data.deviceId)}`, accessToken, {
+          uris: [data.trackUri],
+        });
+        return { ok: true };
+      } catch (e: unknown) {
+        if (!isSpotifyDeviceNotFoundError(e)) throw e;
+      }
     }
 
-    const playUrl = data.deviceId
-      ? `/me/player/play?device_id=${encodeURIComponent(data.deviceId)}`
-      : `/me/player/play`;
-
-    await spotifyPut(playUrl, accessToken, { uris: [data.trackUri] });
+    await spotifyPut(`/me/player/play`, accessToken, { uris: [data.trackUri] });
     return { ok: true };
   });
 
@@ -590,10 +600,12 @@ export const spotifyPausePlayback = createServerFn({ method: "POST" })
       ? await getPlaybackToken(data.eventId, userId)
       : await getValidSpotifyAccessToken(userId);
 
-    await spotifyPut(
-      `/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`,
-      accessToken,
-    );
+    try {
+      await spotifyPut(`/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`, accessToken);
+    } catch (e: unknown) {
+      if (!isSpotifyDeviceNotFoundError(e)) throw e;
+      await spotifyPut(`/me/player/pause`, accessToken);
+    }
     return { ok: true };
   });
 

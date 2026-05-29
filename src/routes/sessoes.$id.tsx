@@ -156,7 +156,7 @@ function SessaoDetail() {
   const [nowPlaying, setNowPlaying] = useState<{ name: string; artist: string } | null>(null);
   const [editingMoment, setEditingMoment] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [executionMode, setExecutionMode] = useState(false);
+  const executionMode = false;
 
   const groupedTracks = useMemo(
     () =>
@@ -580,26 +580,14 @@ function SessaoDetail() {
                 <Share2 className="h-3.5 w-3.5" />
                 Compartilhar
               </Button>
-              <button
-                onClick={() => setExecutionMode((m) => !m)}
-                className={`inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold shadow-[var(--shadow-glow)] transition-all duration-200 hover:scale-[1.02] ${
-                  executionMode
-                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    : "bg-primary text-primary-foreground"
-                }`}
+              <Link
+                to="/sessoes/$id/executar"
+                params={{ id }}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all duration-200 hover:scale-[1.02]"
               >
-                {executionMode ? (
-                  <>
-                    <X className="h-4 w-4" />
-                    Sair
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Executar
-                  </>
-                )}
-              </button>
+                <Play className="h-4 w-4" />
+                Executar
+              </Link>
             </div>
           </div>
         </div>
