@@ -530,18 +530,22 @@ export const getEventSpotifyDevices = createServerFn({ method: "GET" })
     return result.devices.filter((d) => !!d.id && !d.is_restricted);
   });
 
-export const getSpotifySdkToken = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useAppSession();
-  const userId = requireUser(session);
-  const { accessToken } = await getValidSpotifyAccessToken(userId);
-  return { accessToken };
-});
+export const getSpotifySdkToken = createServerFn({ method: "GET" })
+  .inputValidator(z.object({ eventId: z.string().uuid().optional() }))
+  .handler(async ({ data }) => {
+    const session = await useAppSession();
+    const userId = requireUser(session);
+    const { accessToken } = data.eventId
+      ? await getPlaybackToken(data.eventId, userId)
+      : await getValidSpotifyAccessToken(userId);
+    return { accessToken };
+  });
 
 export const spotifyPlayTrack = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       trackUri: z.string().min(1),
-      deviceId: z.string().min(1),
+      deviceId: z.string().optional(),
       eventId: z.string().uuid().optional(),
     }),
   )
@@ -553,15 +557,18 @@ export const spotifyPlayTrack = createServerFn({ method: "POST" })
       ? await getPlaybackToken(data.eventId, userId)
       : await getValidSpotifyAccessToken(userId);
 
-    await spotifyPut(`/me/player`, accessToken, {
-      device_ids: [data.deviceId],
-      play: false,
-    });
-    await spotifyPut(
-      `/me/player/play?device_id=${encodeURIComponent(data.deviceId)}`,
-      accessToken,
-      { uris: [data.trackUri] },
-    );
+    if (data.deviceId) {
+      await spotifyPut(`/me/player`, accessToken, {
+        device_ids: [data.deviceId],
+        play: false,
+      });
+    }
+
+    const playUrl = data.deviceId
+      ? `/me/player/play?device_id=${encodeURIComponent(data.deviceId)}`
+      : `/me/player/play`;
+
+    await spotifyPut(playUrl, accessToken, { uris: [data.trackUri] });
     return { ok: true };
   });
 

@@ -189,7 +189,7 @@ function SessaoDetail() {
     let sdkPlayer: { disconnect: () => void } | null = null;
 
     const setup = async () => {
-      const tokenResult = await getSpotifySdkToken();
+      const tokenResult = await getSpotifySdkToken({ data: { eventId: id } });
       const token = tokenResult.accessToken;
 
       const initPlayer = () => {
@@ -281,6 +281,7 @@ function SessaoDetail() {
         )) as SpotifyDevice[];
         if (ownerDevs.length > 0) {
           setSpotifyConnected(true);
+          setPlaybackMode("sdk");
           setDevices(ownerDevs);
           const active = ownerDevs.find((d) => d.is_active);
           if (active?.id) setSelectedDeviceId(active.id);
@@ -442,10 +443,6 @@ function SessaoDetail() {
     trackName?: string,
     trackArtist?: string,
   ) {
-    if (!selectedDeviceId) {
-      toast.error("Selecione um device Spotify para reprodução.");
-      return;
-    }
     if (!trackUri) {
       toast.error("Faixa sem URI Spotify.");
       return;

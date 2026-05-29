@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -78,6 +77,7 @@ function ExecutarPage() {
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
   const [condutorMode, setCondutorMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [momentFilter, setMomentFilter] = useState<string>("__all__");
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
@@ -130,6 +130,10 @@ function ExecutarPage() {
   const currentGroup = groups[currentMomentIdx];
   const currentTrack = currentGroup?.tracks[currentTrackIdx];
   const trackCount = currentGroup?.tracks.length ?? 0;
+  const filteredGroups = useMemo(
+    () => (momentFilter === "__all__" ? groups : groups.filter((g) => g.m.id === momentFilter)),
+    [groups, momentFilter],
+  );
 
   function canGoPrev(): boolean {
     return currentMomentIdx > 0 || currentTrackIdx > 0;
@@ -179,13 +183,11 @@ function ExecutarPage() {
   }
 
   async function handlePlay(trackUri: string) {
-    if (!selectedDeviceId) {
-      toast.error("Nenhum device Spotify selecionado.");
-      return;
-    }
     setBusy(true);
     try {
-      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri, eventId: id } });
+      await spotifyPlayTrack({
+        data: { deviceId: selectedDeviceId || undefined, trackUri, eventId: id },
+      });
       setPlaying(true);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao reproduzir");
@@ -296,8 +298,48 @@ function ExecutarPage() {
           </div>
         ) : (
           <>
+            <section className="mb-4 rounded-2xl border border-border/60 bg-card/60 p-4 shadow-[var(--shadow-elegant)]">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Agora</p>
+              <p className="mt-1 text-sm text-accent">{currentGroup?.m.name ?? "Sem momento"}</p>
+              <p className="mt-2 truncate text-base font-semibold text-foreground">
+                {currentTrack?.track_name ?? "Selecione uma faixa"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {currentTrack?.artists_json?.[0] ?? "Sem artista"}
+              </p>
+            </section>
+
+            <div className="mb-4 overflow-x-auto pb-1">
+              <div className="flex w-max gap-2">
+                <button
+                  onClick={() => setMomentFilter("__all__")}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    momentFilter === "__all__"
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-border/60 text-muted-foreground"
+                  }`}
+                >
+                  Todos
+                </button>
+                {groups.map((group) => (
+                  <button
+                    key={group.m.id}
+                    onClick={() => setMomentFilter(group.m.id)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      momentFilter === group.m.id
+                        ? "border-accent bg-accent/15 text-accent"
+                        : "border-border/60 text-muted-foreground"
+                    }`}
+                  >
+                    {group.m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex-1 space-y-4 overflow-y-auto">
-              {groups.map((group, mi) => {
+              {filteredGroups.map((group) => {
+                const mi = groups.findIndex((g) => g.m.id === group.m.id);
                 const isCurrent = mi === currentMomentIdx;
                 const isPast = mi < currentMomentIdx;
                 return (
@@ -408,7 +450,9 @@ function ExecutarPage() {
                 condutorMode ? "pt-6 pb-6 mt-4" : "pt-5 pb-3 mt-4"
               }`}
             >
-              <div className={`flex items-center justify-center gap-${condutorMode ? "10" : "8"}`}>
+              <div
+                className={`flex items-center justify-center ${condutorMode ? "gap-10" : "gap-8"}`}
+              >
                 <button
                   onClick={goPrev}
                   disabled={!canGoPrev()}
