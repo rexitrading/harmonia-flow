@@ -627,7 +627,7 @@ function SessaoDetail() {
                 Momento
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby={undefined}>
               <DialogHeader>
                 <DialogTitle>Novo Momento</DialogTitle>
               </DialogHeader>
@@ -779,7 +779,7 @@ function SessaoDetail() {
                       Adicionar música
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent aria-describedby={undefined}>
                     <DialogHeader>
                       <DialogTitle>Nova Música</DialogTitle>
                     </DialogHeader>
@@ -845,7 +845,7 @@ function SessaoDetail() {
       </main>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="font-display">Compartilhar sessão</DialogTitle>
           </DialogHeader>
