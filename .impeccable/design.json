@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-29T00:00:00-04:00",
+  "title": "Design System: Harmonia",
+  "extensions": {
+    "colorMeta": {
+      "deep-lodge": {
+        "role": "neutral",
+        "displayName": "Deep Lodge",
+        "canonical": "oklch(0.18 0.04 250)",
+        "tonalRamp": [
+          "oklch(0.10 0.04 250)",
+          "oklch(0.14 0.04 250)",
+          "oklch(0.18 0.04 250)",
+          "oklch(0.22 0.04 250)",
+          "oklch(0.30 0.04 250)",
+          "oklch(0.45 0.04 250)",
+          "oklch(0.65 0.03 250)",
+          "oklch(0.85 0.02 250)"
+        ]
+      },
+      "silver-primary": {
+        "role": "primary",
+        "displayName": "Silver Primary",
+        "canonical": "oklch(0.72 0.03 250)",
+        "tonalRamp": [
+          "oklch(0.30 0.03 250)",
+          "oklch(0.40 0.03 250)",
+          "oklch(0.52 0.03 250)",
+          "oklch(0.62 0.03 250)",
+          "oklch(0.72 0.03 250)",
+          "oklch(0.80 0.02 250)",
+          "oklch(0.88 0.02 250)",
+          "oklch(0.95 0.01 250)"
+        ]
+      },
+      "compass-blue": {
+        "role": "accent",
+        "displayName": "Compass Blue",
+        "canonical": "oklch(0.55 0.08 240)",
+        "tonalRamp": [
+          "oklch(0.20 0.08 240)",
+          "oklch(0.30 0.08 240)",
+          "oklch(0.40 0.08 240)",
+          "oklch(0.48 0.08 240)",
+          "oklch(0.55 0.08 240)",
+          "oklch(0.65 0.07 240)",
+          "oklch(0.78 0.05 240)",
+          "oklch(0.90 0.03 240)"
+        ]
+      },
+      "ritual-red": {
+        "role": "destructive",
+        "displayName": "Ritual Red",
+        "canonical": "oklch(0.60 0.20 25)",
+        "tonalRamp": [
+          "oklch(0.20 0.20 25)",
+          "oklch(0.30 0.20 25)",
+          "oklch(0.40 0.20 25)",
+          "oklch(0.50 0.20 25)",
+          "oklch(0.60 0.20 25)",
+          "oklch(0.70 0.16 25)",
+          "oklch(0.80 0.12 25)",
+          "oklch(0.90 0.06 25)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headlines and page titles. Cormorant Garamond for ceremonial weight."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Operational text, descriptions, notes. Inter for surgical legibility."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Eyebrows, status badges, timestamps. Inter uppercase with wide tracking."
+      }
+    },
+    "shadows": [
+      {
+        "name": "glow",
+        "value": "0 8px 40px -8px oklch(0.55 0.12 240 / 0.4)",
+        "purpose": "Subtle luminous halo under primary CTAs. Anchors the element to the dark background without projecting."
+      },
+      {
+        "name": "elegant",
+        "value": "0 4px 24px -4px oklch(0 0 0 / 0.4)",
+        "purpose": "Minimal elevation for dialogs and modals. Diffuse, barely perceptible."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+        "purpose": "Default easing for state transitions (hover, focus, color changes)."
+      },
+      {
+        "name": "ease-out-quart",
+        "value": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "purpose": "Entrance transitions for dialogs and overlays. Fast start, gentle settle."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ],
+    "gradients": [
+      {
+        "name": "hero",
+        "value": "linear-gradient(135deg, oklch(0.18 0.04 250), oklch(0.28 0.08 245))",
+        "purpose": "Landing and login backgrounds. Establishes the nocturnal tone."
+      },
+      {
+        "name": "silver",
+        "value": "linear-gradient(135deg, oklch(0.92 0.01 250), oklch(0.75 0.02 250))",
+        "purpose": "Hero text gradient. Silver shimmer effect on display headings. Used sparingly."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action button. The brightest element on any screen.",
+      "html": "<button class=\"ds-btn-primary\">Criar Sessão</button>",
+      "css": ".ds-btn-primary { background: #a5adbf; color: #1b203b; padding: 8px 16px; font-size: 14px; font-weight: 500; font-family: Inter, system-ui, sans-serif; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s, transform 0.2s; line-height: 1.5; } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #5b7aa6; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action. Transparent until hovered.",
+      "html": "<button class=\"ds-btn-ghost\">Sair</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #f0f1f6; padding: 8px 12px; font-size: 14px; font-weight: 500; font-family: Inter, system-ui, sans-serif; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; line-height: 1.5; } .ds-btn-ghost:hover { background: rgba(91, 122, 166, 0.2); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px #5b7aa6; }"
+    },
+    {
+      "name": "Session Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Session list item. Tonal elevation with interactive border.",
+      "html": "<div class=\"ds-card\"><span class=\"ds-card-badge\">READY</span><h3 class=\"ds-card-title\">Sessão de Iniciação</h3><p class=\"ds-card-meta\">Templo Central · 30/05/2026</p></div>",
+      "css": ".ds-card { background: #202844; border: 1px solid #3a496a; border-radius: 16px; padding: 20px; position: relative; transition: border-color 0.2s; font-family: Inter, system-ui, sans-serif; } .ds-card:hover { border-color: #5b7aa6; } .ds-card-badge { display: inline-block; background: rgba(91, 122, 166, 0.2); color: #5b7aa6; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 4px; margin-bottom: 12px; } .ds-card-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 20px; font-weight: 400; color: #f0f1f6; margin: 0 0 4px; letter-spacing: -0.01em; } .ds-card-meta { font-size: 12px; color: #9ea6b9; margin: 0; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form field. Transparent background with subtle border.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\">Título</label><input class=\"ds-input\" placeholder=\"Ex: Sessão de Iniciação\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font-family: Inter, system-ui, sans-serif; } .ds-label { font-size: 14px; font-weight: 500; color: #f0f1f6; } .ds-input { background: transparent; border: 1px solid #3a496a; border-radius: 8px; padding: 8px 12px; font-size: 14px; color: #f0f1f6; font-family: Inter, system-ui, sans-serif; transition: border-color 0.2s, box-shadow 0.2s; height: 36px; } .ds-input::placeholder { color: #9ea6b9; } .ds-input:focus { outline: none; border-color: #5b7aa6; box-shadow: 0 0 0 1px #5b7aa6; }"
+    },
+    {
+      "name": "App Header",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Top navigation bar with logo and logout. Blurred backdrop.",
+      "html": "<header class=\"ds-header\"><div class=\"ds-header-inner\"><a class=\"ds-logo\" href=\"#\"><span class=\"ds-diamond\"></span><span class=\"ds-logo-text\">Harmonia</span></a><button class=\"ds-btn-ghost\">Sair</button></div></header>",
+      "css": ".ds-header { border-bottom: 1px solid #3a496a; background: rgba(32, 40, 68, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); } .ds-header-inner { max-width: 1152px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; } .ds-logo { display: flex; align-items: center; gap: 8px; text-decoration: none; } .ds-diamond { width: 24px; height: 24px; transform: rotate(45deg); border: 2px solid #a5adbf; } .ds-logo-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 18px; color: #f0f1f6; } .ds-btn-ghost { background: transparent; color: #f0f1f6; padding: 8px 12px; font-size: 14px; font-weight: 500; font-family: Inter, system-ui, sans-serif; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; } .ds-btn-ghost:hover { background: rgba(91, 122, 166, 0.2); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Session status indicator. Uppercase label with accent background.",
+      "html": "<span class=\"ds-badge\">LIVE</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; background: rgba(91, 122, 166, 0.2); color: #5b7aa6; font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Midnight Lodge",
+    "overview": "Harmonia opera na penumbra do templo. O sistema visual é contido e instrumental: cada pixel serve à operação, nada compete com o ritual. A interface é um painel de controle silencioso, lido sob iluminação baixa, operado com uma mão pelo celular durante a sessão. A paleta é monocromática em azul profundo com prata como voz principal. Não há ornamentação decorativa.",
+    "keyCharacteristics": [
+      "Dark-first, mobile-first: projetado para templo escuro e operação por celular",
+      "Monocromático com acento único: azul profundo + prata, sem policromia",
+      "Tipografia dual: serifada cerimonial + sans operacional",
+      "Flat com profundidade tonal: sem sombras decorativas, hierarquia por contraste de luz",
+      "Touch targets generosos: mínimo 44px, navegação com uma mão"
+    ],
+    "rules": [
+      {
+        "name": "The Monochrome Rule",
+        "body": "Toda a interface opera no eixo azul-violeta (hue 240-250). A única exceção cromática é o vermelho destrutivo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Silver Voice Rule",
+        "body": "O prata é a cor de ação e destaque. Sua raridade é o que lhe dá força. Em qualquer tela, o prata deve ocupar no máximo 10-15% da superfície.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Voice Rule",
+        "body": "Cormorant Garamond para peso cerimonial. Inter para informação operacional. Nunca inverter.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Caps Body Rule",
+        "body": "Uppercase é reservado exclusivamente para labels curtos (até 4 palavras) com tracking amplo.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-by-Default Rule",
+        "body": "Superfícies são planas em repouso. Sombras aparecem apenas como resposta a estado ou para elementos flutuantes.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar o prata (silver-primary) como a única cor de ação",
+      "Do manter touch targets mínimos de 44x44px",
+      "Do usar Cormorant Garamond para todos os títulos e headings",
+      "Do comunicar estado por contraste tonal",
+      "Do testar todos os textos para contraste mínimo de 4.5:1 (WCAG AA)",
+      "Do usar prefers-reduced-motion em todas as transições"
+    ],
+    "donts": [
+      "Don't usar estética de app de DJ ou festa (neon, gradientes saturados, Serato, VirtualDJ)",
+      "Don't adicionar cores fora do eixo azul-violeta sem justificativa funcional",
+      "Don't usar sombras projetadas em cards ou superfícies em repouso",
+      "Don't usar uppercase em corpo de texto ou frases com mais de 4 palavras",
+      "Don't usar glassmorphism decorativo",
+      "Don't usar preto puro (#000) como background",
+      "Don't criar animações bounce ou elastic"
+    ]
+  }
+}

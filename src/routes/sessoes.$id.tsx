@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AppHeader } from "@/components/AppHeader";
-import { SpotifyEmbed } from "@/components/SpotifyEmbed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +14,18 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, Plus, Trash2, Music2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronLeft, Plus, Trash2, Music2, Play, Share2, X } from "lucide-react";
 import { extractSpotifyEmbed } from "@/lib/preset-momentos";
 import { toast } from "sonner";
 import {
@@ -28,8 +38,12 @@ import {
   getEventDetail,
   importPlaylistToEvent,
   listSpotifyPlaylists,
+  listUsers,
   removeMoment,
   removeTrack,
+  shareEvent,
+  removeShare,
+  listEventShares,
   spotifyPausePlayback,
   spotifyPlayTrack,
   startSpotifyConnection,
@@ -62,6 +76,14 @@ type Faixa = {
 };
 
 type SpotifyDevice = { id: string; name: string; type: string; is_active: boolean };
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: "rascunho",
+  ready: "pronta",
+  live: "ao vivo",
+  finished: "encerrada",
+  archived: "arquivada",
+};
 
 declare global {
   interface Window {
@@ -98,15 +120,32 @@ function SessaoDetail() {
   });
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
-  const [playlists, setPlaylists] = useState<Array<{ id: string; name: string; tracks: { total: number } }>>([]);
+  const [playlists, setPlaylists] = useState<
+    Array<{ id: string; name: string; tracks: { total: number } }>
+  >([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
   const [devices, setDevices] = useState<SpotifyDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [playbackMode, setPlaybackMode] = useState<"remote" | "sdk">("remote");
   const [sdkReady, setSdkReady] = useState(false);
+  const [deleteMomentTarget, setDeleteMomentTarget] = useState<Momento | null>(null);
+  const [deleteTrackTarget, setDeleteTrackTarget] = useState<Faixa | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [userList, setUserList] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [selectedShareUserId, setSelectedShareUserId] = useState("");
+  const [shareList, setShareList] = useState<Array<{ id: string; name: string; email: string }>>(
+    [],
+  );
 
   const groupedTracks = useMemo(
-    () => momentos.map((m) => ({ m, tracks: faixas.filter((f) => f.moment_id === m.id).sort((a, b) => a.order_index - b.order_index) })),
+    () =>
+      momentos.map((m) => ({
+        m,
+        tracks: faixas
+          .filter((f) => f.moment_id === m.id)
+          .sort((a, b) => a.order_index - b.order_index),
+      })),
     [momentos, faixas],
   );
 
@@ -148,7 +187,10 @@ function SessaoDetail() {
           setDevices((prev) => {
             const exists = prev.some((d) => d.id === device_id);
             if (exists) return prev;
-            return [{ id: device_id, name: "Harmonia Web Player", type: "Computer", is_active: true }, ...prev];
+            return [
+              { id: device_id, name: "Harmonia Web Player", type: "Computer", is_active: true },
+              ...prev,
+            ];
           });
         });
 
@@ -245,7 +287,9 @@ function SessaoDetail() {
   async function handleImportPlaylist() {
     if (!selectedPlaylistId) return;
     try {
-      await importPlaylistToEvent({ data: { eventId: id, spotify_playlist_id: selectedPlaylistId } });
+      await importPlaylistToEvent({
+        data: { eventId: id, spotify_playlist_id: selectedPlaylistId },
+      });
       toast.success("Playlist importada");
       await load();
     } catch (e: unknown) {
@@ -265,10 +309,28 @@ function SessaoDetail() {
     }
   }
 
-  async function handleRemoveMomento(mid: string) {
-    if (!confirm("Excluir este momento e suas músicas?")) return;
-    await removeMoment({ data: { momentId: mid } });
-    await load();
+  async function confirmRemoveMomento() {
+    if (!deleteMomentTarget) return;
+    try {
+      await removeMoment({ data: { momentId: deleteMomentTarget.id } });
+      toast.success("Momento excluído");
+      setDeleteMomentTarget(null);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir momento");
+    }
+  }
+
+  async function confirmRemoveFaixa() {
+    if (!deleteTrackTarget) return;
+    try {
+      await removeTrack({ data: { trackId: deleteTrackTarget.id } });
+      toast.success("Música excluída");
+      setDeleteTrackTarget(null);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir música");
+    }
   }
 
   async function handleAddFaixa(momentoId: string) {
@@ -297,9 +359,48 @@ function SessaoDetail() {
     }
   }
 
-  async function handleRemoveFaixa(fid: string) {
-    await removeTrack({ data: { trackId: fid } });
-    await load();
+  async function loadShares() {
+    try {
+      const list = await listEventShares({ data: { eventId: id } });
+      setShareList(list as Array<{ id: string; name: string; email: string }>);
+    } catch {
+      setShareList([]);
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const list = await listUsers();
+      setUserList(list as Array<{ id: string; name: string; email: string }>);
+    } catch {
+      setUserList([]);
+    }
+  }
+
+  async function handleShare() {
+    if (!selectedShareUserId) return;
+    setShareBusy(true);
+    try {
+      const target = userList.find((u) => u.id === selectedShareUserId);
+      await shareEvent({ data: { eventId: id, targetEmail: target!.email } });
+      toast.success("Sessão compartilhada");
+      setSelectedShareUserId("");
+      await loadShares();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao compartilhar");
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function handleRemoveShare(targetUserId: string) {
+    try {
+      await removeShare({ data: { eventId: id, targetUserId } });
+      toast.success("Compartilhamento removido");
+      await loadShares();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao remover");
+    }
   }
 
   async function handlePlayTrack(trackUri: string | null) {
@@ -350,7 +451,11 @@ function SessaoDetail() {
     }
   }
 
-  async function handleMoveTrackWithinMoment(trackId: string, momentId: string, direction: "up" | "down") {
+  async function handleMoveTrackWithinMoment(
+    trackId: string,
+    momentId: string,
+    direction: "up" | "down",
+  ) {
     const list = faixas
       .filter((f) => f.moment_id === momentId)
       .sort((a, b) => a.order_index - b.order_index);
@@ -371,7 +476,8 @@ function SessaoDetail() {
     }
   }
 
-  if (loading || !user || !sessao) return <div className="min-h-screen bg-background" />;
+  if (loading || !user) return <DetailSkeleton />;
+  if (!sessao) return <DetailSkeleton />;
 
   return (
     <div className="min-h-screen bg-background">
@@ -385,74 +491,129 @@ function SessaoDetail() {
         </Link>
 
         <div className="mb-8 rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-elegant)]">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            <span>{sessao.status}</span>·
-            <span>{new Date(sessao.event_date).toLocaleDateString("pt-BR")}</span>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                <span>{STATUS_LABEL[sessao.status] || sessao.status}</span>·
+                <span>{new Date(sessao.event_date).toLocaleDateString("pt-BR")}</span>
+              </div>
+              <h1 className="mt-3 font-display text-4xl">{sessao.title}</h1>
+              {sessao.notes && <p className="mt-3 text-sm text-muted-foreground">{sessao.notes}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShareOpen(true);
+                  loadShares();
+                  loadUsers();
+                }}
+                className="gap-1.5 border-border/60 text-xs"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                Compartilhar
+              </Button>
+              <Link
+                to="/sessoes/$id/executar"
+                params={{ id }}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition hover:scale-[1.02]"
+              >
+                <Play className="h-4 w-4" />
+                Executar
+              </Link>
+            </div>
           </div>
-          <h1 className="mt-3 font-display text-4xl">{sessao.title}</h1>
-          {sessao.notes && <p className="mt-3 text-sm text-muted-foreground">{sessao.notes}</p>}
         </div>
 
-        <section className="mb-8 rounded-xl border border-border bg-card/60 p-6">
-          <h2 className="font-display text-2xl">Spotify</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {spotifyConnected
-              ? `Conectado como ${spotifyDisplayName || "usuário Spotify"}`
-              : "Conta não conectada"}
-          </p>
-          {!spotifyConnected ? (
-            <Button className="mt-4" onClick={handleConnectSpotify}>
-              Conectar Spotify
-            </Button>
-          ) : (
-            <div className="mt-4 space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button variant={playbackMode === "remote" ? "default" : "outline"} onClick={() => setPlaybackMode("remote")}>Controle remoto</Button>
-                <Button variant={playbackMode === "sdk" ? "default" : "outline"} onClick={() => setPlaybackMode("sdk")}>SDK Web Player</Button>
-                <Button variant="outline" onClick={handleDisconnectSpotify}>Desconectar Spotify</Button>
-                {playbackMode === "sdk" && (
-                  <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-                    {sdkReady ? "SDK pronto" : "Inicializando SDK..."}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-3 md:flex-row">
-                <select
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  value={selectedPlaylistId}
-                  onChange={(e) => setSelectedPlaylistId(e.target.value)}
-                >
-                  <option value="">Selecione uma playlist</option>
-                  {playlists.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.tracks?.total ?? 0} faixas)
-                    </option>
-                  ))}
-                </select>
-                <Button onClick={handleImportPlaylist} disabled={!selectedPlaylistId}>
-                  Importar para esta sessão
-                </Button>
-              </div>
-              <div className="flex flex-col gap-3 md:flex-row">
-                <select
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  value={selectedDeviceId}
-                  onChange={(e) => setSelectedDeviceId(e.target.value)}
-                >
-                  <option value="">Selecione um device Spotify</option>
-                  {devices.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.type}) {d.is_active ? "- ativo" : ""}
-                    </option>
-                  ))}
-                </select>
-                <Button variant="outline" onClick={handlePausePlayback} disabled={!selectedDeviceId}>
-                  Pause
-                </Button>
-              </div>
+        <details className="group mb-8 rounded-xl border border-border bg-card/60 transition open:shadow-[var(--shadow-elegant)]">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-6">
+            <div>
+              <h2 className="font-display text-2xl">Spotify</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {spotifyConnected
+                  ? `Conectado como ${spotifyDisplayName || "usuário Spotify"}`
+                  : "Conta não conectada"}
+              </p>
             </div>
-          )}
-        </section>
+            <span className="text-xs text-muted-foreground transition group-open:rotate-180">
+              ▼
+            </span>
+          </summary>
+          <div className="border-t border-border px-6 pb-6 pt-4">
+            {!spotifyConnected ? (
+              <Button onClick={handleConnectSpotify} size="sm">
+                Conectar Spotify
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={playbackMode === "remote" ? "default" : "outline"}
+                    onClick={() => setPlaybackMode("remote")}
+                    size="sm"
+                  >
+                    Controle remoto
+                  </Button>
+                  <Button
+                    variant={playbackMode === "sdk" ? "default" : "outline"}
+                    onClick={() => setPlaybackMode("sdk")}
+                    size="sm"
+                  >
+                    SDK Web Player
+                  </Button>
+                  <Button variant="outline" onClick={handleDisconnectSpotify} size="sm">
+                    Desconectar
+                  </Button>
+                  {playbackMode === "sdk" && (
+                    <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+                      {sdkReady ? "SDK pronto" : "Inicializando SDK..."}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={selectedPlaylistId}
+                    onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                  >
+                    <option value="">Selecione uma playlist</option>
+                    {playlists.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.tracks?.total ?? 0} faixas)
+                      </option>
+                    ))}
+                  </select>
+                  <Button onClick={handleImportPlaylist} disabled={!selectedPlaylistId} size="sm">
+                    Importar
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <select
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={selectedDeviceId}
+                    onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  >
+                    <option value="">Selecione um device Spotify</option>
+                    {devices.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.type}) {d.is_active ? "- ativo" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    onClick={handlePausePlayback}
+                    disabled={!selectedDeviceId}
+                    size="sm"
+                  >
+                    Pause
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-2xl">Momentos da Sessão</h2>
@@ -470,11 +631,16 @@ function SessaoDetail() {
               <div className="space-y-4">
                 <div>
                   <Label>Nome</Label>
-                  <Input value={novoMomento.nome} onChange={(e) => setNovoMomento({ nome: e.target.value })} />
+                  <Input
+                    value={novoMomento.nome}
+                    onChange={(e) => setNovoMomento({ nome: e.target.value })}
+                  />
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>Adicionar</Button>
+                <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
+                  Adicionar
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -482,64 +648,132 @@ function SessaoDetail() {
 
         <div className="space-y-6">
           {groupedTracks.map(({ m, tracks }, idx) => (
-            <section key={m.id} className="rounded-xl border border-border bg-card/60 p-6">
+            <section
+              key={m.id}
+              className="group/moment rounded-xl border border-border/60 bg-gradient-to-b from-card/60 to-card/30 p-6 transition-all duration-300 hover:border-border/80"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="rounded-full bg-secondary px-2 py-0.5 font-mono">{String(idx + 1).padStart(2, "0")}</span>
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-medium tracking-tight text-secondary-foreground">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <span className="font-medium text-foreground/70">{m.name}</span>
                   </div>
                   <h3 className="mt-2 font-display text-xl">{m.name}</h3>
                 </div>
-                <button onClick={() => handleRemoveMomento(m.id)} aria-label="Excluir momento">
-                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                <button
+                  onClick={() => setDeleteMomentTarget(m)}
+                  className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
+                  aria-label="Excluir momento"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
 
               <div className="mt-5 space-y-3">
-                {tracks.length === 0 && <p className="text-xs text-muted-foreground italic">Nenhuma música adicionada.</p>}
+                {tracks.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">Nenhuma música adicionada.</p>
+                )}
                 {tracks.map((f) => (
-                  <div key={f.id} className="rounded-lg border border-border bg-background/40 p-4">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div>
+                  <div
+                    key={f.id}
+                    className="group/track rounded-xl border border-border/40 bg-gradient-to-b from-card/70 to-card/30 p-4 transition-all duration-300 hover:border-accent/40 hover:bg-accent/[0.02]"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <Music2 className="h-3.5 w-3.5 text-accent" />
-                          <p className="font-medium">{f.track_name}</p>
-                          {f.artists_json?.[0] && <span className="text-xs text-muted-foreground">— {f.artists_json[0]}</span>}
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                            <Music2 className="h-3.5 w-3.5" />
+                          </span>
+                          <p className="truncate font-medium text-foreground/90">{f.track_name}</p>
+                          {f.artists_json?.[0] && (
+                            <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+                              — {f.artists_json[0]}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <button onClick={() => handleRemoveFaixa(f.id)} aria-label="Excluir música">
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      <button
+                        onClick={() => setDeleteTrackTarget(f)}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground/40 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Excluir música"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => handlePlayTrack(f.spotify_uri)}>Tocar completo</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}>Subir</Button>
-                      <Button size="sm" variant="outline" onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}>Descer</Button>
+                    {f.artists_json?.[0] && (
+                      <p className="mb-3 text-xs text-muted-foreground sm:hidden">
+                        {f.artists_json[0]}
+                      </p>
+                    )}
+
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      <Button
+                        size="sm"
+                        onClick={() => handlePlayTrack(f.spotify_uri)}
+                        className="h-7 gap-1.5 rounded-lg bg-accent/10 px-3 text-xs font-medium text-accent transition-all duration-200 hover:bg-accent/20 active:scale-[0.97]"
+                      >
+                        <Play className="h-3 w-3" />
+                        Tocar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}
+                        className="h-7 rounded-lg border-border/60 px-2.5 text-xs text-muted-foreground transition-all duration-200 hover:bg-secondary/50 hover:text-foreground"
+                      >
+                        Subir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}
+                        className="h-7 rounded-lg border-border/60 px-2.5 text-xs text-muted-foreground transition-all duration-200 hover:bg-secondary/50 hover:text-foreground"
+                      >
+                        Descer
+                      </Button>
                     </div>
                     <div className="mb-3">
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={f.moment_id} onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}>
-                        {momentos.map((mom) => (<option key={mom.id} value={mom.id}>{mom.name}</option>))}
+                      <select
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={f.moment_id}
+                        onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}
+                      >
+                        {momentos.map((mom) => (
+                          <option key={mom.id} value={mom.id}>
+                            {mom.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <Textarea
                       value={f.note ?? ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setFaixas((prev) => prev.map((t) => (t.id === f.id ? { ...t, note: val } : t)));
+                        setFaixas((prev) =>
+                          prev.map((t) => (t.id === f.id ? { ...t, note: val } : t)),
+                        );
                       }}
                       onBlur={(e) => handleChangeTrackNote(f.id, e.target.value)}
                       placeholder="Observação da faixa neste momento"
                       className="mb-3"
                     />
-                    {f.spotify_url && <SpotifyEmbed url={f.spotify_url} />}
                   </div>
                 ))}
 
-                <Dialog open={faixaOpenFor === m.id} onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}>
+                <Dialog
+                  open={faixaOpenFor === m.id}
+                  onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}
+                >
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full border border-dashed border-border">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full border border-dashed border-border"
+                    >
                       <Plus className="mr-1 h-4 w-4" />
-                      Adicionar música do Spotify
+                      Adicionar música
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -551,7 +785,9 @@ function SessaoDetail() {
                         <Label>Link do Spotify</Label>
                         <Input
                           value={novaFaixa.spotify_url}
-                          onChange={(e) => setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })}
+                          onChange={(e) =>
+                            setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })
+                          }
                           placeholder="https://open.spotify.com/track/..."
                         />
                       </div>
@@ -567,7 +803,9 @@ function SessaoDetail() {
                           <Label>Artista</Label>
                           <Input
                             value={novaFaixa.artista}
-                            onChange={(e) => setNovaFaixa({ ...novaFaixa, artista: e.target.value })}
+                            onChange={(e) =>
+                              setNovaFaixa({ ...novaFaixa, artista: e.target.value })
+                            }
                           />
                         </div>
                       </div>
@@ -575,12 +813,19 @@ function SessaoDetail() {
                         <Label>Descrição / contexto</Label>
                         <Textarea
                           value={novaFaixa.descricao}
-                          onChange={(e) => setNovaFaixa({ ...novaFaixa, descricao: e.target.value })}
+                          onChange={(e) =>
+                            setNovaFaixa({ ...novaFaixa, descricao: e.target.value })
+                          }
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={() => handleAddFaixa(m.id)} disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}>Adicionar</Button>
+                      <Button
+                        onClick={() => handleAddFaixa(m.id)}
+                        disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}
+                      >
+                        Adicionar
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -593,6 +838,134 @@ function SessaoDetail() {
               Nenhum momento. Adicione manualmente acima.
             </div>
           )}
+        </div>
+      </main>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Compartilhar sessão</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <select
+                value={selectedShareUserId}
+                onChange={(e) => setSelectedShareUserId(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Selecione um usuário</option>
+                {userList.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+              <Button onClick={handleShare} disabled={!selectedShareUserId || shareBusy}>
+                {shareBusy ? "..." : "Compartilhar"}
+              </Button>
+            </div>
+            {shareList.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Compartilhado com:</p>
+                {shareList.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between rounded-lg border border-border/60 bg-card/40 px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{s.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{s.email}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveShare(s.id)}
+                      className="ml-2 rounded-md p-1.5 text-muted-foreground/40 transition hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remover"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!deleteMomentTarget}
+        onOpenChange={(o) => !o && setDeleteMomentTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">Excluir momento</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteMomentTarget?.name}" e todas as suas músicas serão excluídos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveMomento}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir momento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteTrackTarget}
+        onOpenChange={(o) => !o && setDeleteTrackTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">Excluir música</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deleteTrackTarget?.track_name}" será removida desta sessão.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveFaixa}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir música
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <AppHeader />
+      <main className="mx-auto max-w-4xl px-6 py-10">
+        <Skeleton className="mb-6 h-5 w-20" />
+        <div className="mb-8 rounded-2xl border border-border bg-card p-8">
+          <Skeleton className="h-3 w-32 mb-3" />
+          <Skeleton className="h-9 w-3/4" />
+          <Skeleton className="mt-3 h-4 w-1/2" />
+        </div>
+        <div className="mb-8 rounded-xl border border-border bg-card/60 p-6">
+          <Skeleton className="h-7 w-24 mb-3" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-7 w-48 mb-4" />
+        <div className="space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card/60 p-6">
+              <Skeleton className="h-5 w-16 mb-2" />
+              <Skeleton className="h-6 w-40" />
+              <div className="mt-5 space-y-3">
+                <Skeleton className="h-24 w-full rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       </main>
     </div>

@@ -15,7 +15,11 @@ export function AppHeader() {
     <header className="border-b border-border bg-card/40 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link to="/sessoes" className="flex items-center gap-2">
-          <div className="h-6 w-6 rotate-45 border-2 border-primary" />
+          <img
+            src="https://cdn.ggailabs.com/portal/harmonia-app.png"
+            alt="Harmonia"
+            className="h-6 w-6"
+          />
           <span className="font-display text-lg">Harmonia</span>
         </Link>
         <Button variant="ghost" size="sm" onClick={logout}>

@@ -1,13 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Music, Sparkles, Users } from "lucide-react";
+import { Play } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Harmonia — Gestão Musical da Loja Maçônica" },
-      { name: "description", content: "Organize as músicas do Spotify por momento da sessão. Facilite o trabalho da Harmonia." },
+      {
+        name: "description",
+        content:
+          "Organize as músicas do Spotify por momento da sessão. Facilite o trabalho da Harmonia.",
+      },
     ],
   }),
   component: Landing,
@@ -22,53 +26,44 @@ function Landing() {
   }, [user, loading, navigate]);
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--gradient-hero)" }}>
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rotate-45 border-2 border-primary" />
+    <div className="flex min-h-screen flex-col" style={{ background: "var(--gradient-hero)" }}>
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-6">
+        <div className="flex items-center gap-3">
+          <img
+            src="https://cdn.ggailabs.com/portal/harmonia-app.png"
+            alt="Harmonia"
+            className="h-8 w-8"
+          />
           <span className="font-display text-xl">Harmonia</span>
         </div>
-        <Link to="/login" className="rounded-md border border-border px-4 py-2 text-sm hover:bg-secondary">
+        <Link
+          to="/login"
+          className="rounded-md border border-border/60 px-4 py-2 text-sm text-muted-foreground transition hover:bg-secondary/50 hover:text-foreground"
+        >
           Entrar
         </Link>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 pt-20 pb-32 text-center">
-        <p className="mb-4 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Para o Chefe de Harmonia
-        </p>
-        <h1 className="font-display text-5xl md:text-7xl leading-tight">
-          A trilha sonora dos
-          <br />
-          <span style={{ backgroundImage: "var(--gradient-silver)", WebkitBackgroundClip: "text", color: "transparent" }}>
-            trabalhos ritualísticos
-          </span>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 text-center">
+        <img
+          src="https://cdn.ggailabs.com/portal/harmonia-app.png"
+          alt="Harmonia"
+          className="h-16 w-16"
+        />
+        <h1 className="mt-6 font-display text-5xl leading-tight text-foreground md:text-6xl">
+          Harmonia
         </h1>
-        <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
-          Organize playlists do Spotify por momento da sessão. Aprendiz, Companheiro ou Mestre — tudo pronto, ao alcance de um clique.
+        <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
+          Organize a música dos trabalhos ritualísticos. Crie sessões, importe playlists do Spotify
+          e execute ao vivo.
         </p>
-        <div className="mt-10 flex justify-center gap-3">
-          <Link
-            to="/login"
-            className="rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition hover:scale-[1.02]"
-          >
-            Começar agora
-          </Link>
-        </div>
-
-        <div className="mt-24 grid gap-6 md:grid-cols-3">
-          {[
-            { icon: Music, t: "Spotify integrado", d: "Cole o link, toque direto no app." },
-            { icon: Sparkles, t: "Momentos prontos", d: "Ritual padrão dos três graus pré-cadastrados." },
-            { icon: Users, t: "Colaborativo", d: "Toda a Harmonia da Loja em um só lugar." },
-          ].map(({ icon: Icon, t, d }) => (
-            <div key={t} className="rounded-lg border border-border bg-card/50 p-6 text-left backdrop-blur">
-              <Icon className="mb-3 h-5 w-5 text-accent" />
-              <h3 className="font-display text-xl">{t}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{d}</p>
-            </div>
-          ))}
-        </div>
+        <Link
+          to="/login"
+          className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Play className="h-4 w-4" />
+          Acessar Harmonia
+        </Link>
       </main>
     </div>
   );

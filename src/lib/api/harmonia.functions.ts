@@ -511,7 +511,10 @@ export const spotifyPausePlayback = createServerFn({ method: "POST" })
     const userId = requireUser(session);
     const { accessToken } = await getValidSpotifyAccessToken(userId);
 
-    await spotifyPut(`/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`, accessToken);
+    await spotifyPut(
+      `/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`,
+      accessToken,
+    );
     return { ok: true };
   });
 
@@ -521,7 +524,22 @@ export const listEvents = createServerFn({ method: "GET" }).handler(async () => 
   const userId = requireUser(session);
 
   const result = await db.query(
-    "SELECT id, title, event_date, location, notes, status FROM events WHERE owner_user_id = $1 ORDER BY event_date DESC",
+    `SELECT e.id, e.title, e.event_date, e.location, e.notes, e.status,
+            u.name AS owner_name, false AS shared
+     FROM events e
+     JOIN users u ON u.id = e.owner_user_id
+     WHERE e.owner_user_id = $1
+
+     UNION ALL
+
+     SELECT e.id, e.title, e.event_date, e.location, e.notes, e.status,
+            u.name AS owner_name, true AS shared
+     FROM event_shares es
+     JOIN events e ON e.id = es.event_id
+     JOIN users u ON u.id = e.owner_user_id
+     WHERE es.shared_with_user_id = $1
+
+     ORDER BY event_date DESC`,
     [userId],
   );
   return result.rows;
@@ -570,7 +588,12 @@ export const getEventDetail = createServerFn({ method: "GET" })
     const userId = requireUser(session);
 
     const event = await db.query(
-      "SELECT id, title, event_date, location, notes, status FROM events WHERE id = $1 AND owner_user_id = $2",
+      `SELECT e.id, e.title, e.event_date, e.location, e.notes, e.status
+       FROM events e
+       WHERE e.id = $1 AND (
+         e.owner_user_id = $2
+         OR EXISTS (SELECT 1 FROM event_shares WHERE event_id = $1 AND shared_with_user_id = $2)
+       )`,
       [data.eventId, userId],
     );
     if (!event.rows[0]) throw new Error("Evento não encontrado");
@@ -707,3 +730,79 @@ export const updateEventTrack = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const shareEvent = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ eventId: z.string().uuid(), targetEmail: z.string().email() }))
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    const target = await db.query<{ id: string }>("SELECT id FROM users WHERE email = $1", [
+      data.targetEmail,
+    ]);
+    if (!target.rows[0]) throw new Error("Usuário não encontrado");
+    if (target.rows[0].id === userId) throw new Error("Você não pode compartilhar consigo mesmo");
+
+    const own = await db.query("SELECT id FROM events WHERE id = $1 AND owner_user_id = $2", [
+      data.eventId,
+      userId,
+    ]);
+    if (!own.rows[0]) throw new Error("Evento não encontrado");
+
+    await db.query(
+      `INSERT INTO event_shares (event_id, shared_with_user_id)
+       VALUES ($1, $2) ON CONFLICT (event_id, shared_with_user_id) DO NOTHING`,
+      [data.eventId, target.rows[0].id],
+    );
+
+    return { ok: true };
+  });
+
+export const removeShare = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ eventId: z.string().uuid(), targetUserId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    await db.query(
+      `DELETE FROM event_shares
+       WHERE event_id = $1 AND shared_with_user_id = $2
+       AND EXISTS (SELECT 1 FROM events WHERE id = $1 AND owner_user_id = $3)`,
+      [data.eventId, data.targetUserId, userId],
+    );
+
+    return { ok: true };
+  });
+
+export const listEventShares = createServerFn({ method: "GET" })
+  .inputValidator(z.object({ eventId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    const rows = await db.query(
+      `SELECT u.id, u.name, u.email, es.role, es.created_at
+       FROM event_shares es
+       JOIN users u ON u.id = es.shared_with_user_id
+       WHERE es.event_id = $1
+       AND EXISTS (SELECT 1 FROM events WHERE id = $1 AND owner_user_id = $2)`,
+      [data.eventId, userId],
+    );
+
+    return rows.rows;
+  });
+
+export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
+  const db = getDb();
+  const session = await useAppSession();
+  const userId = requireUser(session);
+
+  const rows = await db.query(
+    `SELECT id, name, email FROM users WHERE id != $1 ORDER BY name ASC`,
+    [userId],
+  );
+  return rows.rows;
+});

@@ -14,6 +14,7 @@ import { Route as SessoesRouteRouteImport } from './routes/sessoes.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessoesIndexRouteImport } from './routes/sessoes.index'
 import { Route as SessoesIdRouteImport } from './routes/sessoes.$id'
+import { Route as SessoesIdExecutarRouteImport } from './routes/sessoes.$id.executar'
 import { Route as AuthSpotifyCallbackRouteImport } from './routes/auth.spotify.callback'
 
 const LoginRoute = LoginRouteImport.update({
@@ -41,6 +42,11 @@ const SessoesIdRoute = SessoesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => SessoesRouteRoute,
 } as any)
+const SessoesIdExecutarRoute = SessoesIdExecutarRouteImport.update({
+  id: '/executar',
+  path: '/executar',
+  getParentRoute: () => SessoesIdRoute,
+} as any)
 const AuthSpotifyCallbackRoute = AuthSpotifyCallbackRouteImport.update({
   id: '/auth/spotify/callback',
   path: '/auth/spotify/callback',
@@ -51,25 +57,28 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRoute
+  '/sessoes/$id': typeof SessoesIdRouteWithChildren
   '/sessoes/': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
+  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRoute
+  '/sessoes/$id': typeof SessoesIdRouteWithChildren
   '/sessoes': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
+  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRoute
+  '/sessoes/$id': typeof SessoesIdRouteWithChildren
   '/sessoes/': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
+  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -80,8 +89,15 @@ export interface FileRouteTypes {
     | '/sessoes/$id'
     | '/sessoes/'
     | '/auth/spotify/callback'
+    | '/sessoes/$id/executar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/sessoes/$id' | '/sessoes' | '/auth/spotify/callback'
+  to:
+    | '/'
+    | '/login'
+    | '/sessoes/$id'
+    | '/sessoes'
+    | '/auth/spotify/callback'
+    | '/sessoes/$id/executar'
   id:
     | '__root__'
     | '/'
@@ -90,6 +106,7 @@ export interface FileRouteTypes {
     | '/sessoes/$id'
     | '/sessoes/'
     | '/auth/spotify/callback'
+    | '/sessoes/$id/executar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,6 +153,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessoesIdRouteImport
       parentRoute: typeof SessoesRouteRoute
     }
+    '/sessoes/$id/executar': {
+      id: '/sessoes/$id/executar'
+      path: '/executar'
+      fullPath: '/sessoes/$id/executar'
+      preLoaderRoute: typeof SessoesIdExecutarRouteImport
+      parentRoute: typeof SessoesIdRoute
+    }
     '/auth/spotify/callback': {
       id: '/auth/spotify/callback'
       path: '/auth/spotify/callback'
@@ -146,13 +170,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SessoesIdRouteChildren {
+  SessoesIdExecutarRoute: typeof SessoesIdExecutarRoute
+}
+
+const SessoesIdRouteChildren: SessoesIdRouteChildren = {
+  SessoesIdExecutarRoute: SessoesIdExecutarRoute,
+}
+
+const SessoesIdRouteWithChildren = SessoesIdRoute._addFileChildren(
+  SessoesIdRouteChildren,
+)
+
 interface SessoesRouteRouteChildren {
-  SessoesIdRoute: typeof SessoesIdRoute
+  SessoesIdRoute: typeof SessoesIdRouteWithChildren
   SessoesIndexRoute: typeof SessoesIndexRoute
 }
 
 const SessoesRouteRouteChildren: SessoesRouteRouteChildren = {
-  SessoesIdRoute: SessoesIdRoute,
+  SessoesIdRoute: SessoesIdRouteWithChildren,
   SessoesIndexRoute: SessoesIndexRoute,
 }
 
