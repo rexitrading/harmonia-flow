@@ -19,6 +19,7 @@ import {
   getEventDetail,
   getSpotifyConnectionStatus,
   getSpotifyDevices,
+  getEventSpotifyDevices,
   spotifyPlayTrack,
   spotifyPausePlayback,
 } from "@/lib/api/harmonia.functions";
@@ -102,6 +103,15 @@ function ExecutarPage() {
         const active = devs.find((d) => d.is_active);
         if (active?.id) setSelectedDeviceId(active.id);
         else if (devs.length > 0 && devs[0].id) setSelectedDeviceId(devs[0].id);
+      } else {
+        const ownerDevs = (await getEventSpotifyDevices({ data: { eventId: id } }).catch(
+          () => [],
+        )) as SpotifyDevice[];
+        setSpotifyConnected(true);
+        setDeviceList(ownerDevs);
+        const active = ownerDevs.find((d) => d.is_active);
+        if (active?.id) setSelectedDeviceId(active.id);
+        else if (ownerDevs.length > 0 && ownerDevs[0].id) setSelectedDeviceId(ownerDevs[0].id);
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao carregar sessão");

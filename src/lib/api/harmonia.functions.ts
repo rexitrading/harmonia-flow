@@ -497,6 +497,39 @@ export const getSpotifyDevices = createServerFn({ method: "GET" }).handler(async
   return data.devices.filter((d) => !!d.id && !d.is_restricted);
 });
 
+export const getEventSpotifyDevices = createServerFn({ method: "GET" })
+  .inputValidator(z.object({ eventId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const { spotifyGet } = await import("@/lib/spotify.server");
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    let tokenUserId = userId;
+    try {
+      await getValidSpotifyAccessToken(userId);
+    } catch {
+      const db = getDb();
+      const owner = await db.query<{ owner_user_id: string }>(
+        "SELECT owner_user_id FROM events WHERE id = $1",
+        [data.eventId],
+      );
+      if (!owner.rows[0]) throw new Error("Evento não encontrado");
+      tokenUserId = owner.rows[0].owner_user_id;
+    }
+
+    const { accessToken } = await getValidSpotifyAccessToken(tokenUserId);
+    const result = await spotifyGet<{
+      devices: Array<{
+        id: string | null;
+        is_active: boolean;
+        is_restricted: boolean;
+        name: string;
+        type: string;
+      }>;
+    }>("/me/player/devices", accessToken);
+    return result.devices.filter((d) => !!d.id && !d.is_restricted);
+  });
+
 export const getSpotifySdkToken = createServerFn({ method: "GET" }).handler(async () => {
   const session = await useAppSession();
   const userId = requireUser(session);
