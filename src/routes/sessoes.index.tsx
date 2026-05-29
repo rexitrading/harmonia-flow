@@ -27,7 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createEvent, deleteEvent, listEvents } from "@/lib/api/harmonia.functions";
+import { createEvent, deleteEvent, listEvents, updateEventStatus } from "@/lib/api/harmonia.functions";
 
 export const Route = createFileRoute("/sessoes/")({
   head: () => ({ meta: [{ title: "Sessões — Harmonia" }] }),
@@ -121,6 +121,16 @@ function SessoesPage() {
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao excluir");
+    }
+  }
+
+  async function changeStatus(sessao: Sessao, status: Sessao["status"]) {
+    try {
+      await updateEventStatus({ data: { eventId: sessao.id, status } });
+      setSessoes((prev) => prev.map((s) => (s.id === sessao.id ? { ...s, status } : s)));
+      toast.success("Status atualizado");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao atualizar status");
     }
   }
 
@@ -265,7 +275,12 @@ function SessoesPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((s) => (
-              <SessionCard key={s.id} sessao={s} onDelete={() => setDeleteTarget(s)} />
+              <SessionCard
+                key={s.id}
+                sessao={s}
+                onDelete={() => setDeleteTarget(s)}
+                onChangeStatus={(status) => changeStatus(s, status)}
+              />
             ))}
           </div>
         )}
@@ -295,7 +310,15 @@ function SessoesPage() {
   );
 }
 
-function SessionCard({ sessao, onDelete }: { sessao: Sessao; onDelete: () => void }) {
+function SessionCard({
+  sessao,
+  onDelete,
+  onChangeStatus,
+}: {
+  sessao: Sessao;
+  onDelete: () => void;
+  onChangeStatus: (status: Sessao["status"]) => void;
+}) {
   const date = new Date(sessao.event_date);
   const now = Date.now();
   const diffMs = date.getTime() - now;
@@ -305,7 +328,24 @@ function SessionCard({ sessao, onDelete }: { sessao: Sessao; onDelete: () => voi
 
   return (
     <div className="group relative rounded-lg border border-border bg-card p-5 transition hover:border-accent">
-      <Link to="/sessoes/$id" params={{ id: sessao.id }} className="block">
+      <div className="mb-3">
+        <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
+          Status
+        </label>
+        <select
+          value={sessao.status}
+          disabled={!!sessao.shared}
+          onChange={(e) => onChangeStatus(e.target.value as Sessao["status"])}
+          className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="draft">Rascunho</option>
+          <option value="ready">Pronta</option>
+          <option value="live">Ao vivo</option>
+          <option value="finished">Encerrada</option>
+          <option value="archived">Arquivada</option>
+        </select>
+      </div>
+      <Link to="/sessoes/$id" params={{ id: sessao.id }} className="block pr-10">
         <div className="flex items-start justify-between gap-2">
           <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] uppercase tracking-wider text-accent-foreground">
             {STATUS_LABEL[sessao.status] || sessao.status}
@@ -336,7 +376,7 @@ function SessionCard({ sessao, onDelete }: { sessao: Sessao; onDelete: () => voi
           e.preventDefault();
           onDelete();
         }}
-        className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover:opacity-100"
+        className="absolute right-3 bottom-3 rounded-md bg-card/80 p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover:opacity-100"
         aria-label="Excluir sessão"
       >
         <Trash2 className="h-4 w-4" />

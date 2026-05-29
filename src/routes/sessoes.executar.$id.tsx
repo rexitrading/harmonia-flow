@@ -368,7 +368,7 @@ function ExecutarPage() {
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-4 py-6 pt-20 pb-24">
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-4 py-6 pt-20 pb-24 md:pb-6">
         {groups.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Nenhum momento configurado nesta sessão.
@@ -417,7 +417,7 @@ function ExecutarPage() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 space-y-3 overflow-y-auto pb-56">
+            <div className="flex-1 min-h-0 space-y-3 overflow-y-auto pb-56 md:pb-40">
               <p className="px-1 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
                 Sequence
               </p>
@@ -488,7 +488,7 @@ function ExecutarPage() {
         )}
       </main>
 
-      <section className="fixed inset-x-0 bottom-16 z-40 border-t border-border/60 bg-background/95 backdrop-blur">
+      <section className="fixed inset-x-0 bottom-16 z-40 border-t border-border/60 bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.25)] md:bottom-0">
         <div className="mx-auto w-full max-w-4xl px-4 pt-3 pb-3">
           {currentTrack && (
             <div className="mx-auto mb-2 max-w-sm text-center text-xs">
@@ -541,7 +541,7 @@ function ExecutarPage() {
         </div>
       </section>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 py-1 backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background px-2 py-1 md:hidden">
         <div className="mx-auto grid max-w-4xl grid-cols-4">
           <Link to="/" className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
             <Home className="h-4 w-4" />
@@ -551,14 +551,14 @@ function ExecutarPage() {
             <ListMusic className="h-4 w-4" />
             Sessões
           </Link>
-          <button className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
+          <Link to="/biblioteca" className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
             <Library className="h-4 w-4" />
             Biblioteca
-          </button>
-          <button className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
+          </Link>
+          <Link to="/ajustes" className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
             <Settings className="h-4 w-4" />
             Ajustes
-          </button>
+          </Link>
         </div>
       </nav>
     </div>

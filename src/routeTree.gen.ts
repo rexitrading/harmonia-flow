@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as BibliotecaRouteImport } from './routes/biblioteca'
+import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as SessoesRouteRouteImport } from './routes/sessoes.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessoesIndexRouteImport } from './routes/sessoes.index'
@@ -20,6 +22,16 @@ import { Route as AuthSpotifyCallbackRouteImport } from './routes/auth.spotify.c
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BibliotecaRoute = BibliotecaRouteImport.update({
+  id: '/biblioteca',
+  path: '/biblioteca',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AjustesRoute = AjustesRouteImport.update({
+  id: '/ajustes',
+  path: '/ajustes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessoesRouteRoute = SessoesRouteRouteImport.update({
@@ -56,6 +68,8 @@ const AuthSpotifyCallbackRoute = AuthSpotifyCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
+  '/ajustes': typeof AjustesRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
@@ -64,6 +78,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes': typeof SessoesIndexRoute
@@ -74,6 +90,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
+  '/ajustes': typeof AjustesRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/login': typeof LoginRoute
   '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
@@ -85,6 +103,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/sessoes'
+    | '/ajustes'
+    | '/biblioteca'
     | '/login'
     | '/sessoes/$id'
     | '/sessoes/'
@@ -93,6 +113,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ajustes'
+    | '/biblioteca'
     | '/login'
     | '/sessoes/$id'
     | '/sessoes'
@@ -102,6 +124,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/sessoes'
+    | '/ajustes'
+    | '/biblioteca'
     | '/login'
     | '/sessoes/$id'
     | '/sessoes/'
@@ -112,6 +136,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SessoesRouteRoute: typeof SessoesRouteRouteWithChildren
+  AjustesRoute: typeof AjustesRoute
+  BibliotecaRoute: typeof BibliotecaRoute
   LoginRoute: typeof LoginRoute
   AuthSpotifyCallbackRoute: typeof AuthSpotifyCallbackRoute
 }
@@ -123,6 +149,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biblioteca': {
+      id: '/biblioteca'
+      path: '/biblioteca'
+      fullPath: '/biblioteca'
+      preLoaderRoute: typeof BibliotecaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ajustes': {
+      id: '/ajustes'
+      path: '/ajustes'
+      fullPath: '/ajustes'
+      preLoaderRoute: typeof AjustesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessoes': {
@@ -189,6 +229,8 @@ const SessoesRouteRouteWithChildren = SessoesRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SessoesRouteRoute: SessoesRouteRouteWithChildren,
+  AjustesRoute: AjustesRoute,
+  BibliotecaRoute: BibliotecaRoute,
   LoginRoute: LoginRoute,
   AuthSpotifyCallbackRoute: AuthSpotifyCallbackRoute,
 }

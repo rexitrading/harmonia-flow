@@ -671,6 +671,29 @@ export const deleteEvent = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateEventStatus = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      eventId: z.string().uuid(),
+      status: z.enum(["draft", "ready", "live", "finished", "archived"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const session = await useAppSession();
+    const userId = requireUser(session);
+
+    const updated = await db.query(
+      `UPDATE events
+       SET status = $3, updated_at = now()
+       WHERE id = $1 AND owner_user_id = $2
+       RETURNING id`,
+      [data.eventId, userId, data.status],
+    );
+    if (!updated.rows[0]) throw new Error("Evento não encontrado ou sem permissão");
+    return { ok: true };
+  });
+
 export const getEventDetail = createServerFn({ method: "GET" })
   .inputValidator(z.object({ eventId: z.string().uuid() }))
   .handler(async ({ data }) => {
