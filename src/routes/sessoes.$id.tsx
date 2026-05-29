@@ -438,7 +438,7 @@ function SessaoDetail() {
       return;
     }
     try {
-      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri } });
+      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri, eventId: id } });
       if (trackName) setNowPlaying({ name: trackName, artist: trackArtist || "" });
       toast.success("Reprodução iniciada");
     } catch (e: unknown) {
@@ -452,7 +452,7 @@ function SessaoDetail() {
       return;
     }
     try {
-      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId } });
+      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId, eventId: id } });
       toast.success("Reprodução pausada");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao pausar reprodução");

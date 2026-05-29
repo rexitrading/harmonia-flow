@@ -175,7 +175,7 @@ function ExecutarPage() {
     }
     setBusy(true);
     try {
-      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri } });
+      await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri, eventId: id } });
       setPlaying(true);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao reproduzir");
@@ -188,7 +188,7 @@ function ExecutarPage() {
     if (!selectedDeviceId) return;
     setBusy(true);
     try {
-      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId } });
+      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId, eventId: id } });
       setPlaying(false);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao pausar");

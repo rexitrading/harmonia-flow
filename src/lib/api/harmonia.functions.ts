@@ -78,6 +78,27 @@ async function getValidSpotifyAccessToken(userId: string) {
   return { accountId: account.id, accessToken: refreshed.access_token };
 }
 
+async function getPlaybackToken(eventId: string, userId: string) {
+  const db = getDb();
+  try {
+    return await getValidSpotifyAccessToken(userId);
+  } catch {
+    const owner = await db.query<{ owner_user_id: string }>(
+      "SELECT owner_user_id FROM events WHERE id = $1",
+      [eventId],
+    );
+    if (!owner.rows[0]) throw new Error("Evento não encontrado");
+    const shareCheck = await db.query(
+      "SELECT id FROM event_shares WHERE event_id = $1 AND shared_with_user_id = $2",
+      [eventId, userId],
+    );
+    if (!shareCheck.rows[0] && owner.rows[0].owner_user_id !== userId) {
+      throw new Error("Sem acesso ao Spotify do evento");
+    }
+    return await getValidSpotifyAccessToken(owner.rows[0].owner_user_id);
+  }
+}
+
 async function fetchPlaylistItems(
   spotifyGet: <T>(path: string, accessToken: string) => Promise<T>,
   accessToken: string,
@@ -484,12 +505,20 @@ export const getSpotifySdkToken = createServerFn({ method: "GET" }).handler(asyn
 });
 
 export const spotifyPlayTrack = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ trackUri: z.string().min(1), deviceId: z.string().min(1) }))
+  .inputValidator(
+    z.object({
+      trackUri: z.string().min(1),
+      deviceId: z.string().min(1),
+      eventId: z.string().uuid().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const { spotifyPut } = await import("@/lib/spotify.server");
     const session = await useAppSession();
     const userId = requireUser(session);
-    const { accessToken } = await getValidSpotifyAccessToken(userId);
+    const { accessToken } = data.eventId
+      ? await getPlaybackToken(data.eventId, userId)
+      : await getValidSpotifyAccessToken(userId);
 
     await spotifyPut(`/me/player`, accessToken, {
       device_ids: [data.deviceId],
@@ -504,12 +533,14 @@ export const spotifyPlayTrack = createServerFn({ method: "POST" })
   });
 
 export const spotifyPausePlayback = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ deviceId: z.string().min(1) }))
+  .inputValidator(z.object({ deviceId: z.string().min(1), eventId: z.string().uuid().optional() }))
   .handler(async ({ data }) => {
     const { spotifyPut } = await import("@/lib/spotify.server");
     const session = await useAppSession();
     const userId = requireUser(session);
-    const { accessToken } = await getValidSpotifyAccessToken(userId);
+    const { accessToken } = data.eventId
+      ? await getPlaybackToken(data.eventId, userId)
+      : await getValidSpotifyAccessToken(userId);
 
     await spotifyPut(
       `/me/player/pause?device_id=${encodeURIComponent(data.deviceId)}`,
