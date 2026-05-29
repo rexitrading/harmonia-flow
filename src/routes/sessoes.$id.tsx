@@ -157,6 +157,16 @@ function SessaoDetail() {
   const [editingMoment, setEditingMoment] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const executionMode = false;
+  const [movingAllByMoment, setMovingAllByMoment] = useState<Record<string, string>>({});
+
+  const CERIMONIA_MOMENTOS_PADRAO = [
+    "Entrada dos padrinhos",
+    "Entrada do noivo",
+    "Entrada da noiva",
+    "Alianças",
+    "Assinatura",
+    "Saída",
+  ];
 
   const groupedTracks = useMemo(
     () =>
@@ -344,6 +354,19 @@ function SessaoDetail() {
     }
   }
 
+  async function handleCreateDefaultMoments() {
+    try {
+      for (const nome of CERIMONIA_MOMENTOS_PADRAO) {
+        if (momentos.some((m) => m.name.toLowerCase() === nome.toLowerCase())) continue;
+        await addMoment({ data: { eventId: id, name: nome } });
+      }
+      toast.success("Momentos padrão criados");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao criar momentos padrão");
+    }
+  }
+
   async function confirmRemoveMomento() {
     if (!deleteMomentTarget) return;
     try {
@@ -514,6 +537,22 @@ function SessaoDetail() {
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao atualizar observação");
+    }
+  }
+
+  async function handleMoveAllTracks(sourceMomentId: string, targetMomentId: string) {
+    if (!targetMomentId || sourceMomentId === targetMomentId) return;
+    const sourceTracks = faixas.filter((f) => f.moment_id === sourceMomentId);
+    if (sourceTracks.length === 0) return;
+    try {
+      for (const track of sourceTracks) {
+        await updateEventTrack({ data: { trackId: track.id, momentId: targetMomentId } });
+      }
+      toast.success("Músicas movidas com sucesso");
+      setMovingAllByMoment((prev) => ({ ...prev, [sourceMomentId]: "" }));
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao mover músicas em lote");
     }
   }
 
@@ -690,33 +729,38 @@ function SessaoDetail() {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-2xl">Momentos da Sessão</h2>
           {!executionMode && (
-            <Dialog open={addMomentoOpen} onOpenChange={setAddMomentoOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <Plus className="mr-1 h-4 w-4" />
-                  Momento
-                </Button>
-              </DialogTrigger>
-              <DialogContent aria-describedby={undefined}>
-                <DialogHeader>
-                  <DialogTitle>Novo Momento</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Nome</Label>
-                    <Input
-                      value={novoMomento.nome}
-                      onChange={(e) => setNovoMomento({ nome: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
-                    Adicionar
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleCreateDefaultMoments}>
+                Criar padrão
+              </Button>
+              <Dialog open={addMomentoOpen} onOpenChange={setAddMomentoOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Plus className="mr-1 h-4 w-4" />
+                    Momento
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent aria-describedby={undefined}>
+                  <DialogHeader>
+                    <DialogTitle>Novo Momento</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Nome</Label>
+                      <Input
+                        value={novoMomento.nome}
+                        onChange={(e) => setNovoMomento({ nome: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
+                      Adicionar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
 
@@ -809,6 +853,35 @@ function SessaoDetail() {
               </div>
 
               <div className="mt-5 space-y-3">
+                {tracks.length > 0 && !executionMode && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/30 p-3 sm:flex-row sm:items-center">
+                    <span className="text-xs text-muted-foreground">Mover todas deste momento para:</span>
+                    <select
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm sm:max-w-xs"
+                      value={movingAllByMoment[m.id] ?? ""}
+                      onChange={(e) =>
+                        setMovingAllByMoment((prev) => ({ ...prev, [m.id]: e.target.value }))
+                      }
+                    >
+                      <option value="">Selecione um momento</option>
+                      {momentos
+                        .filter((mom) => mom.id !== m.id)
+                        .map((mom) => (
+                          <option key={mom.id} value={mom.id}>
+                            {mom.name}
+                          </option>
+                        ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!movingAllByMoment[m.id]}
+                      onClick={() => handleMoveAllTracks(m.id, movingAllByMoment[m.id] ?? "")}
+                    >
+                      Mover todas
+                    </Button>
+                  </div>
+                )}
                 {tracks.length === 0 && (
                   <p className="text-xs text-muted-foreground italic">Nenhuma música adicionada.</p>
                 )}

@@ -215,9 +215,12 @@ function ExecutarPage() {
   async function handlePlay(trackUri: string) {
     setBusy(true);
     try {
+      const fallbackDeviceId =
+        selectedDeviceId || deviceList.find((d) => d.is_active)?.id || deviceList[0]?.id;
       await spotifyPlayTrack({
-        data: { deviceId: selectedDeviceId || undefined, trackUri, eventId: id },
+        data: { deviceId: fallbackDeviceId || undefined, trackUri, eventId: id },
       });
+      if (!selectedDeviceId && fallbackDeviceId) setSelectedDeviceId(fallbackDeviceId);
       setPlaying(true);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao reproduzir");
@@ -227,10 +230,16 @@ function ExecutarPage() {
   }
 
   async function handlePause() {
-    if (!selectedDeviceId) return;
     setBusy(true);
     try {
-      await spotifyPausePlayback({ data: { deviceId: selectedDeviceId, eventId: id } });
+      const fallbackDeviceId =
+        selectedDeviceId || deviceList.find((d) => d.is_active)?.id || deviceList[0]?.id;
+      if (!fallbackDeviceId) {
+        toast.error("Nenhum dispositivo Spotify disponível.");
+        return;
+      }
+      await spotifyPausePlayback({ data: { deviceId: fallbackDeviceId, eventId: id } });
+      if (!selectedDeviceId) setSelectedDeviceId(fallbackDeviceId);
       setPlaying(false);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao pausar");
