@@ -11,7 +11,11 @@ import {
   SkipForward,
   Car,
   Smartphone,
-  Music2,
+  Home,
+  ListMusic,
+  Library,
+  Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -134,6 +138,35 @@ function ExecutarPage() {
     () => (momentFilter === "__all__" ? groups : groups.filter((g) => g.m.id === momentFilter)),
     [groups, momentFilter],
   );
+  const currentAbsoluteIndex = useMemo(() => {
+    let acc = 0;
+    for (let i = 0; i < groups.length; i += 1) {
+      if (i < currentMomentIdx) acc += groups[i].tracks.length;
+      else if (i === currentMomentIdx) {
+        acc += currentTrackIdx;
+        break;
+      }
+    }
+    return acc;
+  }, [groups, currentMomentIdx, currentTrackIdx]);
+  const sequenceItems = useMemo(
+    () =>
+      filteredGroups.flatMap((group) =>
+        group.tracks.map((track, localIndex) => {
+          const globalMomentIndex = groups.findIndex((g) => g.m.id === group.m.id);
+          const absoluteIndex =
+            groups
+              .slice(0, globalMomentIndex)
+              .reduce((sum, g) => sum + g.tracks.length, 0) + localIndex;
+          return {
+            track,
+            momentName: group.m.name,
+            absoluteIndex,
+          };
+        }),
+      ),
+    [filteredGroups, groups],
+  );
 
   function canGoPrev(): boolean {
     return currentMomentIdx > 0 || currentTrackIdx > 0;
@@ -223,7 +256,7 @@ function ExecutarPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-card/40 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
           <Link
             to="/sessoes/$id"
@@ -257,7 +290,7 @@ function ExecutarPage() {
       </header>
 
       {!spotifyConnected && (
-        <div className="mx-auto mt-4 max-w-4xl px-4">
+        <div className="mx-auto mt-20 max-w-4xl px-4">
           <div className="rounded-lg border border-border bg-card/60 p-4 text-center text-sm text-muted-foreground">
             Spotify não conectado.{""}
             <Link
@@ -272,7 +305,7 @@ function ExecutarPage() {
       )}
 
       {deviceList.length > 0 && (
-        <div className="mx-auto mt-3 w-full max-w-4xl px-4">
+        <div className="mx-auto mt-20 w-full max-w-4xl px-4">
           <select
             value={selectedDeviceId}
             onChange={(e) => setSelectedDeviceId(e.target.value)}
@@ -289,7 +322,7 @@ function ExecutarPage() {
 
       <main
         className={`mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 ${
-          condutorMode ? "py-4" : "py-6"
+          condutorMode ? "py-4 pt-20 pb-24" : "py-6 pt-20 pb-24"
         }`}
       >
         {groups.length === 0 ? (
@@ -337,110 +370,64 @@ function ExecutarPage() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-4 overflow-y-auto">
-              {filteredGroups.map((group) => {
-                const mi = groups.findIndex((g) => g.m.id === group.m.id);
-                const isCurrent = mi === currentMomentIdx;
-                const isPast = mi < currentMomentIdx;
+            <div className="flex-1 space-y-3 overflow-y-auto">
+              <p className="px-1 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                Sequence
+              </p>
+              {sequenceItems.map((item) => {
+                const isActive = item.absoluteIndex === currentAbsoluteIndex;
+                const isCompleted = item.absoluteIndex < currentAbsoluteIndex;
+                const groupIndex = groups.findIndex((g) => g.m.name === item.momentName);
+                const trackIndex = groups[groupIndex]?.tracks.findIndex(
+                  (t) => t.id === item.track.id,
+                );
                 return (
-                  <div
-                    key={group.m.id}
-                    className={`rounded-xl border transition-all duration-300 ${
-                      isCurrent
-                        ? "border-accent/70 bg-gradient-to-b from-card to-card/80 shadow-[var(--shadow-glow)] ring-1 ring-accent/10"
-                        : isPast
-                          ? "border-border/30 bg-card/20 opacity-40"
-                          : "border-border/50 bg-card/40 hover:border-border/70"
-                    } ${condutorMode ? "p-4" : "p-5"}`}
+                  <button
+                    key={item.track.id}
+                    onClick={() => selectTrack(groupIndex, Math.max(trackIndex, 0))}
+                    disabled={!item.track.spotify_uri}
+                    className={`relative flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition ${
+                      isActive
+                        ? "border-accent/80 bg-secondary/30 shadow-[0_0_0_1px_var(--accent)]"
+                        : isCompleted
+                          ? "border-border/40 bg-secondary/20 opacity-60"
+                          : "border-border/70 bg-secondary/25 hover:border-accent/60"
+                    }`}
                   >
-                    <div className={`flex items-center gap-2 ${isCurrent ? "mb-3" : ""}`}>
-                      <span
-                        className={`inline-flex items-center justify-center rounded-full text-[11px] font-medium transition-all ${
-                          isCurrent
-                            ? "h-6 w-6 bg-accent text-accent-foreground shadow-[0_0_12px_-2px_var(--accent)]"
-                            : "h-5 w-5 bg-secondary text-muted-foreground"
-                        }`}
-                      >
-                        {String(mi + 1).padStart(2, "0")}
-                      </span>
-                      <span
-                        className={`${isCurrent ? "text-sm font-medium text-foreground/80" : "text-xs text-muted-foreground"}`}
-                      >
-                        {group.m.name}
-                      </span>
-                      {isCurrent && (
-                        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-accent">
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${playing ? "animate-pulse bg-accent" : "bg-accent/50"}`}
-                          />
-                          {playing ? "ao vivo" : "selecionado"}
-                        </span>
+                    {isActive && <span className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-accent" />}
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                        isActive
+                          ? "border-accent bg-accent/20"
+                          : isCompleted
+                            ? "border-border/70 bg-background/80"
+                            : "border-border/70 bg-background/70"
+                      }`}
+                    >
+                      {isActive ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                      ) : isCompleted ? (
+                        <span className="text-sm text-accent">✓</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{item.absoluteIndex + 1}</span>
                       )}
                     </div>
-
-                    <div className={isCurrent ? "space-y-1" : "mt-2 space-y-0.5"}>
-                      {group.tracks.map((t, ti) => {
-                        const isActive = isCurrent && ti === currentTrackIdx;
-                        return (
-                          <button
-                            key={t.id}
-                            onClick={() => selectTrack(mi, ti)}
-                            disabled={!t.spotify_uri}
-                            className={`flex w-full items-center gap-3 rounded-xl text-left transition-all duration-200 ${
-                              isActive
-                                ? condutorMode
-                                  ? "bg-accent/15 p-4 ring-1 ring-accent/20"
-                                  : "bg-accent/12 p-3 ring-1 ring-accent/15"
-                                : condutorMode
-                                  ? "p-3 hover:bg-secondary/40"
-                                  : "p-2.5 hover:bg-secondary/30"
-                            } ${!t.spotify_uri ? "opacity-40" : ""}`}
-                          >
-                            <div
-                              className={`flex shrink-0 items-center justify-center rounded-full transition-all ${
-                                isActive
-                                  ? "bg-accent text-accent-foreground shadow-[0_0_10px_-2px_var(--accent)]"
-                                  : "bg-secondary/60 text-muted-foreground"
-                              } ${condutorMode ? "h-9 w-9" : "h-8 w-8"}`}
-                            >
-                              <Music2 className={condutorMode ? "h-4 w-4" : "h-3.5 w-3.5"} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p
-                                className={`truncate font-medium leading-tight ${
-                                  isActive ? "text-accent-foreground" : "text-foreground/80"
-                                } ${condutorMode ? "text-base" : "text-sm"}`}
-                              >
-                                {t.track_name}
-                              </p>
-                              {t.artists_json?.[0] && (
-                                <p
-                                  className={`mt-0.5 truncate text-muted-foreground/60 ${
-                                    condutorMode ? "text-sm" : "text-xs"
-                                  }`}
-                                >
-                                  {t.artists_json[0]}
-                                </p>
-                              )}
-                            </div>
-                            {isActive && playing && (
-                              <div className="flex shrink-0 items-end gap-[3px] px-1">
-                                <span className="h-3 w-[3px] animate-pulse rounded-full bg-accent" />
-                                <span
-                                  className="h-4 w-[3px] animate-pulse rounded-full bg-accent"
-                                  style={{ animationDelay: "0.15s", animationDuration: "0.8s" }}
-                                />
-                                <span
-                                  className="h-2.5 w-[3px] animate-pulse rounded-full bg-accent"
-                                  style={{ animationDelay: "0.3s", animationDuration: "1.1s" }}
-                                />
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-2xl leading-none text-foreground">
+                        {item.momentName}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">
+                        {isActive
+                          ? `Playing • ${item.track.track_name}`
+                          : isCompleted
+                            ? "Completed"
+                            : `Track: ${item.track.track_name}`}
+                      </p>
                     </div>
-                  </div>
+                    <span className="text-muted-foreground/80">
+                      {isActive ? "⋮" : "▷"}
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -501,10 +488,40 @@ function ExecutarPage() {
                   )}
                 </div>
               )}
+
+              <button
+                onClick={handlePause}
+                disabled={!selectedDeviceId || busy}
+                className="mx-auto mt-4 flex w-full max-w-sm items-center justify-center gap-2 rounded-lg border border-destructive/70 bg-transparent px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-destructive transition hover:bg-destructive/10 disabled:opacity-40"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Emergency Stop
+              </button>
             </div>
           </>
         )}
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 py-1 backdrop-blur md:hidden">
+        <div className="mx-auto grid max-w-4xl grid-cols-4">
+          <Link to="/" className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+          <Link to="/sessoes" className="flex flex-col items-center justify-center rounded-lg bg-secondary/40 py-2 text-[10px] text-foreground">
+            <ListMusic className="h-4 w-4" />
+            Sessões
+          </Link>
+          <button className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
+            <Library className="h-4 w-4" />
+            Biblioteca
+          </button>
+          <button className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
+            <Settings className="h-4 w-4" />
+            Ajustes
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
