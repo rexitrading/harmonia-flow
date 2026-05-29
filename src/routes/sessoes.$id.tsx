@@ -25,7 +25,21 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, Plus, Trash2, Music2, Play, Share2, X } from "lucide-react";
+import {
+  ChevronLeft,
+  Plus,
+  Trash2,
+  Music2,
+  Play,
+  Pause,
+  Share2,
+  X,
+  ChevronUp,
+  ChevronDown,
+  Pencil,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { extractSpotifyEmbed } from "@/lib/preset-momentos";
 import { toast } from "sonner";
 import {
@@ -40,6 +54,7 @@ import {
   listSpotifyPlaylists,
   listUsers,
   removeMoment,
+  updateMoment,
   removeTrack,
   shareEvent,
   removeShare,
@@ -137,6 +152,9 @@ function SessaoDetail() {
   const [shareList, setShareList] = useState<Array<{ id: string; name: string; email: string }>>(
     [],
   );
+  const [nowPlaying, setNowPlaying] = useState<{ name: string; artist: string } | null>(null);
+  const [editingMoment, setEditingMoment] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const groupedTracks = useMemo(
     () =>
@@ -406,7 +424,11 @@ function SessaoDetail() {
     }
   }
 
-  async function handlePlayTrack(trackUri: string | null) {
+  async function handlePlayTrack(
+    trackUri: string | null,
+    trackName?: string,
+    trackArtist?: string,
+  ) {
     if (!selectedDeviceId) {
       toast.error("Selecione um device Spotify para reprodução.");
       return;
@@ -417,6 +439,7 @@ function SessaoDetail() {
     }
     try {
       await spotifyPlayTrack({ data: { deviceId: selectedDeviceId, trackUri } });
+      if (trackName) setNowPlaying({ name: trackName, artist: trackArtist || "" });
       toast.success("Reprodução iniciada");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao reproduzir faixa");
@@ -433,6 +456,36 @@ function SessaoDetail() {
       toast.success("Reprodução pausada");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Erro ao pausar reprodução");
+    }
+  }
+
+  async function handleRenameMoment(momentId: string) {
+    if (!editingName.trim()) return;
+    try {
+      await updateMoment({ data: { momentId, name: editingName.trim() } });
+      setEditingMoment(null);
+      setEditingName("");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao renomear");
+    }
+  }
+
+  async function handleMoveMoment(momentId: string, direction: "up" | "down") {
+    const idx = momentos.findIndex((m) => m.id === momentId);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= momentos.length) return;
+
+    const current = momentos[idx];
+    const target = momentos[targetIdx];
+
+    try {
+      await updateMoment({ data: { momentId: current.id, orderIndex: target.order_index } });
+      await updateMoment({ data: { momentId: target.id, orderIndex: current.order_index } });
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reordenar");
     }
   }
 
@@ -493,8 +546,8 @@ function SessaoDetail() {
           <ChevronLeft className="h-4 w-4" /> Voltar
         </Link>
 
-        <div className="mb-8 rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-elegant)]">
-          <div className="flex items-start justify-between gap-4">
+        <div className="mb-8 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-elegant)] sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
                 <span>{STATUS_LABEL[sessao.status] || sessao.status}</span>·
@@ -657,21 +710,82 @@ function SessaoDetail() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-medium tracking-tight text-secondary-foreground">
                       {String(idx + 1).padStart(2, "0")}
                     </span>
-                    <span className="font-medium text-foreground/70">{m.name}</span>
+                    <div className="flex gap-0.5">
+                      <button
+                        onClick={() => handleMoveMoment(m.id, "up")}
+                        disabled={idx === 0}
+                        className="rounded p-0.5 text-muted-foreground/40 transition hover:text-foreground disabled:opacity-20"
+                        aria-label="Subir momento"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveMoment(m.id, "down")}
+                        disabled={idx === momentos.length - 1}
+                        className="rounded p-0.5 text-muted-foreground/40 transition hover:text-foreground disabled:opacity-20"
+                        aria-label="Descer momento"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="mt-2 font-display text-xl">{m.name}</h3>
+                  {editingMoment === m.id ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="w-full rounded-md border border-accent/50 bg-background px-2 py-1 font-display text-xl outline-none"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRenameMoment(m.id);
+                          if (e.key === "Escape") {
+                            setEditingMoment(null);
+                            setEditingName("");
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => handleRenameMoment(m.id)}
+                        className="rounded-md bg-accent/20 px-2 py-1 text-xs text-accent"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  ) : (
+                    <h3
+                      className="mt-2 cursor-pointer font-display text-xl transition hover:text-accent"
+                      onClick={() => {
+                        setEditingMoment(m.id);
+                        setEditingName(m.name);
+                      }}
+                    >
+                      {m.name}
+                    </h3>
+                  )}
                 </div>
-                <button
-                  onClick={() => setDeleteMomentTarget(m)}
-                  className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
-                  aria-label="Excluir momento"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingMoment(m.id);
+                      setEditingName(m.name);
+                    }}
+                    className="rounded-md p-1.5 text-muted-foreground/30 transition hover:text-accent [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
+                    aria-label="Renomear momento"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteMomentTarget(m)}
+                    className="rounded-md p-1.5 text-muted-foreground/30 transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
+                    aria-label="Excluir momento"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-5 space-y-3">
@@ -714,28 +828,28 @@ function SessaoDetail() {
                     <div className="mb-3 flex flex-wrap gap-1.5">
                       <Button
                         size="sm"
-                        onClick={() => handlePlayTrack(f.spotify_uri)}
+                        onClick={() =>
+                          handlePlayTrack(f.spotify_uri, f.track_name, f.artists_json?.[0])
+                        }
                         className="h-7 gap-1.5 rounded-lg bg-accent/10 px-3 text-xs font-medium text-accent transition-all duration-200 hover:bg-accent/20 active:scale-[0.97]"
                       >
                         <Play className="h-3 w-3" />
                         Tocar
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
+                      <button
                         onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}
-                        className="h-7 rounded-lg border-border/60 px-2.5 text-xs text-muted-foreground transition-all duration-200 hover:bg-secondary/50 hover:text-foreground"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-border/60 text-muted-foreground/40 transition hover:bg-secondary/50 hover:text-foreground"
+                        aria-label="Subir faixa"
                       >
-                        Subir
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}
-                        className="h-7 rounded-lg border-border/60 px-2.5 text-xs text-muted-foreground transition-all duration-200 hover:bg-secondary/50 hover:text-foreground"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-border/60 text-muted-foreground/40 transition hover:bg-secondary/50 hover:text-foreground"
+                        aria-label="Descer faixa"
                       >
-                        Descer
-                      </Button>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                     <div className="mb-3">
                       <select
@@ -843,6 +957,38 @@ function SessaoDetail() {
           )}
         </div>
       </main>
+
+      {nowPlaying && (
+        <div className="sticky bottom-0 border-t border-border/60 bg-card/95 backdrop-blur px-4 py-3 shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.3)]">
+          <div className="mx-auto flex max-w-4xl items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs text-muted-foreground/50">Reproduzindo</p>
+              <p className="truncate text-sm font-medium text-foreground/80">{nowPlaying.name}</p>
+              {nowPlaying.artist && (
+                <p className="truncate text-xs text-muted-foreground/50">{nowPlaying.artist}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePausePlayback}
+                disabled={!selectedDeviceId}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-glow)] transition hover:scale-105 active:scale-95 disabled:opacity-40"
+                aria-label="Pausar"
+              >
+                <Pause className="h-4 w-4" />
+              </button>
+              <Link
+                to="/sessoes/$id/executar"
+                params={{ id }}
+                className="flex h-10 items-center gap-1.5 rounded-lg bg-accent/10 px-3 text-xs font-medium text-accent transition hover:bg-accent/20"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Executar
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-md" aria-describedby={undefined}>

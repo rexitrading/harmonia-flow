@@ -651,6 +651,23 @@ export const removeMoment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const updateMoment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      momentId: z.string().uuid(),
+      name: z.string().min(1).optional(),
+      orderIndex: z.number().int().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const db = getDb();
+    await db.query(
+      `UPDATE moments SET name = COALESCE($2, name), order_index = COALESCE($3, order_index), updated_at = now() WHERE id = $1`,
+      [data.momentId, data.name ?? null, data.orderIndex ?? null],
+    );
+    return { ok: true };
+  });
+
 export const addTrack = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
