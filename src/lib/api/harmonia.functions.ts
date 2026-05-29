@@ -205,6 +205,7 @@ export const startSpotifyConnection = createServerFn({ method: "POST" }).handler
     "user-read-private",
     "playlist-read-private",
     "playlist-read-collaborative",
+    "streaming",
     "user-modify-playback-state",
     "user-read-playback-state",
   ].join(" ");
@@ -464,6 +465,13 @@ export const getSpotifyDevices = createServerFn({ method: "GET" }).handler(async
   }>("/me/player/devices", accessToken);
 
   return data.devices.filter((d) => !!d.id && !d.is_restricted);
+});
+
+export const getSpotifySdkToken = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await useAppSession();
+  const userId = requireUser(session);
+  const { accessToken } = await getValidSpotifyAccessToken(userId);
+  return { accessToken };
 });
 
 export const spotifyPlayTrack = createServerFn({ method: "POST" })

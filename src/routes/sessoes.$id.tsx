@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AppHeader } from "@/components/AppHeader";
 import { SpotifyEmbed } from "@/components/SpotifyEmbed";
@@ -23,6 +23,7 @@ import {
   addTrack,
   getSpotifyConnectionStatus,
   getSpotifyDevices,
+  getSpotifySdkToken,
   getEventDetail,
   importPlaylistToEvent,
   listSpotifyPlaylists,
@@ -59,6 +60,25 @@ type Faixa = {
   order_index: number;
 };
 
+type SpotifyDevice = { id: string; name: string; type: string; is_active: boolean };
+
+declare global {
+  interface Window {
+    Spotify?: {
+      Player: new (opts: {
+        name: string;
+        getOAuthToken: (cb: (token: string) => void) => void;
+        volume?: number;
+      }) => {
+        connect: () => Promise<boolean>;
+        disconnect: () => void;
+        addListener: (event: string, cb: (arg: any) => void) => void;
+      };
+    };
+    onSpotifyWebPlaybackSDKReady?: () => void;
+  }
+}
+
 function SessaoDetail() {
   const { id } = Route.useParams();
   const { user, loading } = useAuth();
@@ -77,26 +97,94 @@ function SessaoDetail() {
   });
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyDisplayName, setSpotifyDisplayName] = useState<string | null>(null);
-  const [playlists, setPlaylists] = useState<
-    Array<{ id: string; name: string; tracks: { total: number } }>
-  >([]);
+  const [playlists, setPlaylists] = useState<Array<{ id: string; name: string; tracks: { total: number } }>>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
-  const [devices, setDevices] = useState<
-    Array<{ id: string; name: string; type: string; is_active: boolean }>
-  >([]);
+  const [devices, setDevices] = useState<SpotifyDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
+  const [playbackMode, setPlaybackMode] = useState<"remote" | "sdk">("remote");
+  const [sdkReady, setSdkReady] = useState(false);
+
+  const groupedTracks = useMemo(
+    () => momentos.map((m) => ({ m, tracks: faixas.filter((f) => f.moment_id === m.id).sort((a, b) => a.order_index - b.order_index) })),
+    [momentos, faixas],
+  );
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
   }, [loading, user, navigate]);
 
   useEffect(() => {
-    if (user) load();
+    if (user) void load();
   }, [user, id]);
 
   useEffect(() => {
     if (user) void loadSpotify();
   }, [user]);
+
+  useEffect(() => {
+    if (!spotifyConnected || playbackMode !== "sdk") return;
+
+    let disposed = false;
+    let scriptEl: HTMLScriptElement | null = null;
+    let sdkPlayer: { disconnect: () => void } | null = null;
+
+    const setup = async () => {
+      const tokenResult = await getSpotifySdkToken();
+      const token = tokenResult.accessToken;
+
+      const initPlayer = () => {
+        if (!window.Spotify) return;
+        const player = new window.Spotify.Player({
+          name: "Harmonia Web Player",
+          getOAuthToken: (cb) => cb(token),
+          volume: 0.8,
+        });
+
+        player.addListener("ready", ({ device_id }: any) => {
+          if (disposed) return;
+          setSdkReady(true);
+          setSelectedDeviceId(device_id);
+          setDevices((prev) => {
+            const exists = prev.some((d) => d.id === device_id);
+            if (exists) return prev;
+            return [{ id: device_id, name: "Harmonia Web Player", type: "Computer", is_active: true }, ...prev];
+          });
+        });
+
+        player.addListener("not_ready", () => {
+          if (disposed) return;
+          setSdkReady(false);
+        });
+
+        player.connect().catch(() => {
+          toast.error("Não foi possível conectar o Spotify SDK.");
+        });
+        sdkPlayer = player;
+      };
+
+      if (window.Spotify) {
+        initPlayer();
+        return;
+      }
+
+      window.onSpotifyWebPlaybackSDKReady = initPlayer;
+      scriptEl = document.createElement("script");
+      scriptEl.src = "https://sdk.scdn.co/spotify-player.js";
+      scriptEl.async = true;
+      document.body.appendChild(scriptEl);
+    };
+
+    setup().catch((e: unknown) => {
+      toast.error(e instanceof Error ? e.message : "Erro ao iniciar Spotify SDK");
+    });
+
+    return () => {
+      disposed = true;
+      setSdkReady(false);
+      sdkPlayer?.disconnect();
+      if (scriptEl?.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    };
+  }, [spotifyConnected, playbackMode]);
 
   async function load() {
     try {
@@ -115,10 +203,9 @@ function SessaoDetail() {
       setSpotifyConnected(status.connected);
       setSpotifyDisplayName(status.account?.display_name ?? null);
       if (status.connected) {
-        const pls = await listSpotifyPlaylists();
+        const [pls, devs] = await Promise.all([listSpotifyPlaylists(), getSpotifyDevices()]);
         setPlaylists(pls as Array<{ id: string; name: string; tracks: { total: number } }>);
-        const devs = await getSpotifyDevices();
-        const typed = devs as Array<{ id: string; name: string; type: string; is_active: boolean }>;
+        const typed = devs as SpotifyDevice[];
         setDevices(typed);
         const active = typed.find((d) => d.is_active)?.id ?? "";
         setSelectedDeviceId((prev) => prev || active);
@@ -147,9 +234,7 @@ function SessaoDetail() {
   async function handleImportPlaylist() {
     if (!selectedPlaylistId) return;
     try {
-      await importPlaylistToEvent({
-        data: { eventId: id, spotify_playlist_id: selectedPlaylistId },
-      });
+      await importPlaylistToEvent({ data: { eventId: id, spotify_playlist_id: selectedPlaylistId } });
       toast.success("Playlist importada");
       await load();
     } catch (e: unknown) {
@@ -255,7 +340,9 @@ function SessaoDetail() {
   }
 
   async function handleMoveTrackWithinMoment(trackId: string, momentId: string, direction: "up" | "down") {
-    const list = faixas.filter((f) => f.moment_id === momentId).sort((a, b) => a.order_index - b.order_index);
+    const list = faixas
+      .filter((f) => f.moment_id === momentId)
+      .sort((a, b) => a.order_index - b.order_index);
     const currentIndex = list.findIndex((f) => f.id === trackId);
     if (currentIndex === -1) return;
     const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
@@ -308,6 +395,15 @@ function SessaoDetail() {
             </Button>
           ) : (
             <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button variant={playbackMode === "remote" ? "default" : "outline"} onClick={() => setPlaybackMode("remote")}>Controle remoto</Button>
+                <Button variant={playbackMode === "sdk" ? "default" : "outline"} onClick={() => setPlaybackMode("sdk")}>SDK Web Player</Button>
+                {playbackMode === "sdk" && (
+                  <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+                    {sdkReady ? "SDK pronto" : "Inicializando SDK..."}
+                  </span>
+                )}
+              </div>
               <div className="flex flex-col gap-3 md:flex-row">
                 <select
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -362,189 +458,123 @@ function SessaoDetail() {
               <div className="space-y-4">
                 <div>
                   <Label>Nome</Label>
-                  <Input
-                    value={novoMomento.nome}
-                    onChange={(e) => setNovoMomento({ nome: e.target.value })}
-                  />
+                  <Input value={novoMomento.nome} onChange={(e) => setNovoMomento({ nome: e.target.value })} />
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
-                  Adicionar
-                </Button>
+                <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>Adicionar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
         <div className="space-y-6">
-          {momentos.map((m, idx) => {
-            const tracks = faixas.filter((f) => f.moment_id === m.id);
-            return (
-              <section key={m.id} className="rounded-xl border border-border bg-card/60 p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-full bg-secondary px-2 py-0.5 font-mono">
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <h3 className="mt-2 font-display text-xl">{m.name}</h3>
+          {groupedTracks.map(({ m, tracks }, idx) => (
+            <section key={m.id} className="rounded-xl border border-border bg-card/60 p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="rounded-full bg-secondary px-2 py-0.5 font-mono">{String(idx + 1).padStart(2, "0")}</span>
                   </div>
-                  <button onClick={() => handleRemoveMomento(m.id)} aria-label="Excluir momento">
-                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                  </button>
+                  <h3 className="mt-2 font-display text-xl">{m.name}</h3>
                 </div>
+                <button onClick={() => handleRemoveMomento(m.id)} aria-label="Excluir momento">
+                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                </button>
+              </div>
 
-                <div className="mt-5 space-y-3">
-                  {tracks.length === 0 && (
-                    <p className="text-xs text-muted-foreground italic">
-                      Nenhuma música adicionada.
-                    </p>
-                  )}
-                  {tracks.map((f) => (
-                    <div
-                      key={f.id}
-                      className="rounded-lg border border-border bg-background/40 p-4"
-                    >
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Music2 className="h-3.5 w-3.5 text-accent" />
-                            <p className="font-medium">{f.track_name}</p>
-                            {f.artists_json?.[0] && (
-                              <span className="text-xs text-muted-foreground">
-                                — {f.artists_json[0]}
-                              </span>
-                            )}
-                          </div>
-                          {f.note && <p className="mt-1 text-xs text-muted-foreground">{f.note}</p>}
-                        </div>
-                        <button onClick={() => handleRemoveFaixa(f.id)} aria-label="Excluir música">
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                        </button>
-                      </div>
-                      <div className="mb-3">
-                        <Button size="sm" onClick={() => handlePlayTrack(f.spotify_uri)}>
-                          Tocar completo
-                        </Button>
-                      </div>
-                      <div className="mb-3 grid gap-2 md:grid-cols-2">
-                        <select
-                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                          value={f.moment_id}
-                          onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}
-                        >
-                          {momentos.map((mom) => (
-                            <option key={mom.id} value={mom.id}>
-                              {mom.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}
-                          >
-                            Subir
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}
-                          >
-                            Descer
-                          </Button>
+              <div className="mt-5 space-y-3">
+                {tracks.length === 0 && <p className="text-xs text-muted-foreground italic">Nenhuma música adicionada.</p>}
+                {tracks.map((f) => (
+                  <div key={f.id} className="rounded-lg border border-border bg-background/40 p-4">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Music2 className="h-3.5 w-3.5 text-accent" />
+                          <p className="font-medium">{f.track_name}</p>
+                          {f.artists_json?.[0] && <span className="text-xs text-muted-foreground">— {f.artists_json[0]}</span>}
                         </div>
                       </div>
-                      <Textarea
-                        value={f.note ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFaixas((prev) => prev.map((t) => (t.id === f.id ? { ...t, note: val } : t)));
-                        }}
-                        onBlur={(e) => handleChangeTrackNote(f.id, e.target.value)}
-                        placeholder="Observação da faixa neste momento"
-                        className="mb-3"
-                      />
-                      {f.spotify_url && <SpotifyEmbed url={f.spotify_url} />}
+                      <button onClick={() => handleRemoveFaixa(f.id)} aria-label="Excluir música">
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                      </button>
                     </div>
-                  ))}
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => handlePlayTrack(f.spotify_uri)}>Tocar completo</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "up")}>Subir</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleMoveTrackWithinMoment(f.id, f.moment_id, "down")}>Descer</Button>
+                    </div>
+                    <div className="mb-3">
+                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" value={f.moment_id} onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}>
+                        {momentos.map((mom) => (<option key={mom.id} value={mom.id}>{mom.name}</option>))}
+                      </select>
+                    </div>
+                    <Textarea
+                      value={f.note ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFaixas((prev) => prev.map((t) => (t.id === f.id ? { ...t, note: val } : t)));
+                      }}
+                      onBlur={(e) => handleChangeTrackNote(f.id, e.target.value)}
+                      placeholder="Observação da faixa neste momento"
+                      className="mb-3"
+                    />
+                    {f.spotify_url && <SpotifyEmbed url={f.spotify_url} />}
+                  </div>
+                ))}
 
-                  <Dialog
-                    open={faixaOpenFor === m.id}
-                    onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full border border-dashed border-border"
-                      >
-                        <Plus className="mr-1 h-4 w-4" />
-                        Adicionar música do Spotify
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Nova Música</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
+                <Dialog open={faixaOpenFor === m.id} onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full border border-dashed border-border">
+                      <Plus className="mr-1 h-4 w-4" />
+                      Adicionar música do Spotify
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Nova Música</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Link do Spotify</Label>
+                        <Input
+                          value={novaFaixa.spotify_url}
+                          onChange={(e) => setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })}
+                          placeholder="https://open.spotify.com/track/..."
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label>Link do Spotify</Label>
+                          <Label>Título</Label>
                           <Input
-                            value={novaFaixa.spotify_url}
-                            onChange={(e) =>
-                              setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })
-                            }
-                            placeholder="https://open.spotify.com/track/..."
+                            value={novaFaixa.titulo}
+                            onChange={(e) => setNovaFaixa({ ...novaFaixa, titulo: e.target.value })}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label>Título</Label>
-                            <Input
-                              value={novaFaixa.titulo}
-                              onChange={(e) =>
-                                setNovaFaixa({ ...novaFaixa, titulo: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label>Artista</Label>
-                            <Input
-                              value={novaFaixa.artista}
-                              onChange={(e) =>
-                                setNovaFaixa({ ...novaFaixa, artista: e.target.value })
-                              }
-                            />
-                          </div>
-                        </div>
                         <div>
-                          <Label>Descrição / contexto</Label>
-                          <Textarea
-                            value={novaFaixa.descricao}
-                            onChange={(e) =>
-                              setNovaFaixa({ ...novaFaixa, descricao: e.target.value })
-                            }
+                          <Label>Artista</Label>
+                          <Input
+                            value={novaFaixa.artista}
+                            onChange={(e) => setNovaFaixa({ ...novaFaixa, artista: e.target.value })}
                           />
                         </div>
                       </div>
-                      <DialogFooter>
-                        <Button
-                          onClick={() => handleAddFaixa(m.id)}
-                          disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}
-                        >
-                          Adicionar
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </section>
-            );
-          })}
+                      <div>
+                        <Label>Descrição / contexto</Label>
+                        <Textarea
+                          value={novaFaixa.descricao}
+                          onChange={(e) => setNovaFaixa({ ...novaFaixa, descricao: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => handleAddFaixa(m.id)} disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}>Adicionar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </section>
+          ))}
 
           {momentos.length === 0 && (
             <div className="rounded-lg border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
