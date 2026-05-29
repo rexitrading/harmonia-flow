@@ -276,9 +276,20 @@ function SessaoDetail() {
         const active = typed.find((d) => d.is_active)?.id ?? "";
         setSelectedDeviceId((prev) => prev || active);
       } else {
-        setPlaylists([]);
-        setDevices([]);
-        setSelectedDeviceId("");
+        const ownerDevs = (await getEventSpotifyDevices({ data: { eventId: id } }).catch(
+          () => [],
+        )) as SpotifyDevice[];
+        if (ownerDevs.length > 0) {
+          setSpotifyConnected(true);
+          setDevices(ownerDevs);
+          const active = ownerDevs.find((d) => d.is_active);
+          if (active?.id) setSelectedDeviceId(active.id);
+          else if (ownerDevs[0].id) setSelectedDeviceId(ownerDevs[0].id);
+        } else {
+          setPlaylists([]);
+          setDevices([]);
+          setSelectedDeviceId("");
+        }
       }
     } catch {
       setSpotifyConnected(false);
@@ -687,33 +698,35 @@ function SessaoDetail() {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-2xl">Momentos da Sessão</h2>
-          <Dialog open={addMomentoOpen} onOpenChange={setAddMomentoOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="mr-1 h-4 w-4" />
-                Momento
-              </Button>
-            </DialogTrigger>
-            <DialogContent aria-describedby={undefined}>
-              <DialogHeader>
-                <DialogTitle>Novo Momento</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Nome</Label>
-                  <Input
-                    value={novoMomento.nome}
-                    onChange={(e) => setNovoMomento({ nome: e.target.value })}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
-                  Adicionar
+          {!executionMode && (
+            <Dialog open={addMomentoOpen} onOpenChange={setAddMomentoOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="mr-1 h-4 w-4" />
+                  Momento
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent aria-describedby={undefined}>
+                <DialogHeader>
+                  <DialogTitle>Novo Momento</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Nome</Label>
+                    <Input
+                      value={novoMomento.nome}
+                      onChange={(e) => setNovoMomento({ nome: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddMomento} disabled={!novoMomento.nome}>
+                    Adicionar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -781,25 +794,27 @@ function SessaoDetail() {
                     </h3>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => {
-                      setEditingMoment(m.id);
-                      setEditingName(m.name);
-                    }}
-                    className="rounded-md p-1.5 text-muted-foreground/30 transition hover:text-accent [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
-                    aria-label="Renomear momento"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteMomentTarget(m)}
-                    className="rounded-md p-1.5 text-muted-foreground/30 transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
-                    aria-label="Excluir momento"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                {!executionMode && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingMoment(m.id);
+                        setEditingName(m.name);
+                      }}
+                      className="rounded-md p-1.5 text-muted-foreground/30 transition hover:text-accent [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
+                      aria-label="Renomear momento"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteMomentTarget(m)}
+                      className="rounded-md p-1.5 text-muted-foreground/30 transition hover:bg-destructive/10 hover:text-destructive [@media(hover:none)]:opacity-100 opacity-0 group-hover/moment:opacity-100"
+                      aria-label="Excluir momento"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 space-y-3">
@@ -893,73 +908,77 @@ function SessaoDetail() {
                   </div>
                 ))}
 
-                <Dialog
-                  open={faixaOpenFor === m.id}
-                  onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full border border-dashed border-border"
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Adicionar música
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent aria-describedby={undefined}>
-                    <DialogHeader>
-                      <DialogTitle>Nova Música</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Link do Spotify</Label>
-                        <Input
-                          value={novaFaixa.spotify_url}
-                          onChange={(e) =>
-                            setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })
-                          }
-                          placeholder="https://open.spotify.com/track/..."
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
+                {!executionMode && (
+                  <Dialog
+                    open={faixaOpenFor === m.id}
+                    onOpenChange={(o) => setFaixaOpenFor(o ? m.id : null)}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full border border-dashed border-border"
+                      >
+                        <Plus className="mr-1 h-4 w-4" />
+                        Adicionar música
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent aria-describedby={undefined}>
+                      <DialogHeader>
+                        <DialogTitle>Nova Música</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
                         <div>
-                          <Label>Título</Label>
+                          <Label>Link do Spotify</Label>
                           <Input
-                            value={novaFaixa.titulo}
-                            onChange={(e) => setNovaFaixa({ ...novaFaixa, titulo: e.target.value })}
+                            value={novaFaixa.spotify_url}
+                            onChange={(e) =>
+                              setNovaFaixa({ ...novaFaixa, spotify_url: e.target.value })
+                            }
+                            placeholder="https://open.spotify.com/track/..."
                           />
                         </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Título</Label>
+                            <Input
+                              value={novaFaixa.titulo}
+                              onChange={(e) =>
+                                setNovaFaixa({ ...novaFaixa, titulo: e.target.value })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label>Artista</Label>
+                            <Input
+                              value={novaFaixa.artista}
+                              onChange={(e) =>
+                                setNovaFaixa({ ...novaFaixa, artista: e.target.value })
+                              }
+                            />
+                          </div>
+                        </div>
                         <div>
-                          <Label>Artista</Label>
-                          <Input
-                            value={novaFaixa.artista}
+                          <Label>Descrição / contexto</Label>
+                          <Textarea
+                            value={novaFaixa.descricao}
                             onChange={(e) =>
-                              setNovaFaixa({ ...novaFaixa, artista: e.target.value })
+                              setNovaFaixa({ ...novaFaixa, descricao: e.target.value })
                             }
                           />
                         </div>
                       </div>
-                      <div>
-                        <Label>Descrição / contexto</Label>
-                        <Textarea
-                          value={novaFaixa.descricao}
-                          onChange={(e) =>
-                            setNovaFaixa({ ...novaFaixa, descricao: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        onClick={() => handleAddFaixa(m.id)}
-                        disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}
-                      >
-                        Adicionar
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                      <DialogFooter>
+                        <Button
+                          onClick={() => handleAddFaixa(m.id)}
+                          disabled={!novaFaixa.titulo || !novaFaixa.spotify_url}
+                        >
+                          Adicionar
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </section>
           ))}
