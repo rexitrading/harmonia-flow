@@ -960,15 +960,22 @@ function SessaoDetail() {
 
       {nowPlaying && (
         <div className="sticky bottom-0 border-t border-border/60 bg-card/95 backdrop-blur px-4 py-3 shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.3)]">
-          <div className="mx-auto flex max-w-4xl items-center gap-4">
+          <div className="mx-auto flex max-w-4xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs text-muted-foreground/50">Reproduzindo</p>
-              <p className="truncate text-sm font-medium text-foreground/80">{nowPlaying.name}</p>
+              <p className="truncate text-xs text-muted-foreground/50">{nowPlaying.name}</p>
               {nowPlaying.artist && (
                 <p className="truncate text-xs text-muted-foreground/50">{nowPlaying.artist}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
+              <Link
+                to="/sessoes/$id/executar"
+                params={{ id }}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent transition hover:bg-accent/20"
+                aria-label="Ir para execução"
+              >
+                <SkipForward className="h-4 w-4" />
+              </Link>
               <button
                 onClick={handlePausePlayback}
                 disabled={!selectedDeviceId}
@@ -977,14 +984,6 @@ function SessaoDetail() {
               >
                 <Pause className="h-4 w-4" />
               </button>
-              <Link
-                to="/sessoes/$id/executar"
-                params={{ id }}
-                className="flex h-10 items-center gap-1.5 rounded-lg bg-accent/10 px-3 text-xs font-medium text-accent transition hover:bg-accent/20"
-              >
-                <Play className="h-3.5 w-3.5" />
-                Executar
-              </Link>
             </div>
           </div>
         </div>
