@@ -720,16 +720,29 @@ export const addMoment = createServerFn({ method: "POST" })
     ]);
     if (!check.rows[0]) throw new Error("Evento não encontrado");
 
-    const orderRes = await db.query<{ value: number }>(
-      "SELECT COALESCE(MAX(order_index), -1) + 1 AS value FROM moments WHERE event_id = $1",
-      [data.eventId],
-    );
-    const orderIndex = orderRes.rows[0].value;
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      // Prevent concurrent moment inserts for the same event from computing the same order_index.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [data.eventId]);
 
-    await db.query(
-      "INSERT INTO moments (event_id, name, color, order_index) VALUES ($1, $2, $3, $4)",
-      [data.eventId, data.name, data.color ?? null, orderIndex],
-    );
+      const orderRes = await client.query<{ value: number }>(
+        "SELECT COALESCE(MAX(order_index), -1) + 1 AS value FROM moments WHERE event_id = $1",
+        [data.eventId],
+      );
+      const orderIndex = orderRes.rows[0].value;
+
+      await client.query(
+        "INSERT INTO moments (event_id, name, color, order_index) VALUES ($1, $2, $3, $4)",
+        [data.eventId, data.name, data.color ?? null, orderIndex],
+      );
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
 
     return { ok: true };
   });

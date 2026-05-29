@@ -21,6 +21,7 @@ import {
   getSpotifyConnectionStatus,
   getSpotifyDevices,
   getEventSpotifyDevices,
+  getSpotifySdkToken,
   spotifyPlayTrack,
   spotifyPausePlayback,
 } from "@/lib/api/harmonia.functions";
@@ -64,6 +65,23 @@ type SpotifyDevice = {
   is_active: boolean;
 };
 
+declare global {
+  interface Window {
+    Spotify?: {
+      Player: new (opts: {
+        name: string;
+        getOAuthToken: (cb: (token: string) => void) => void;
+        volume?: number;
+      }) => {
+        connect: () => Promise<boolean>;
+        disconnect: () => void;
+        addListener: (event: string, cb: (arg: any) => void) => void;
+      };
+    };
+    onSpotifyWebPlaybackSDKReady?: () => void;
+  }
+}
+
 function ExecutarPage() {
   const { id } = Route.useParams();
   const { user, loading } = useAuth();
@@ -87,6 +105,67 @@ function ExecutarPage() {
   useEffect(() => {
     if (user) loadAll();
   }, [user, id]);
+
+  useEffect(() => {
+    if (!spotifyConnected) return;
+
+    let disposed = false;
+    let scriptEl: HTMLScriptElement | null = null;
+    let sdkPlayer: { disconnect: () => void } | null = null;
+
+    const setup = async () => {
+      const tokenResult = await getSpotifySdkToken({ data: { eventId: id } });
+      const token = tokenResult.accessToken;
+
+      const initPlayer = () => {
+        if (!window.Spotify) return;
+        const player = new window.Spotify.Player({
+          name: "Harmonia Web Player",
+          getOAuthToken: (cb) => cb(token),
+          volume: 0.8,
+        });
+
+        player.addListener("ready", ({ device_id }: any) => {
+          if (disposed) return;
+          setSelectedDeviceId(device_id);
+          setDeviceList((prev) => {
+            const exists = prev.some((d) => d.id === device_id);
+            if (exists) return prev;
+            return [
+              { id: device_id, name: "Harmonia Web Player", type: "Computer", is_active: true },
+              ...prev,
+            ];
+          });
+        });
+
+        player.connect().catch(() => {
+          toast.error("Não foi possível iniciar o Spotify Web Player na execução.");
+        });
+        sdkPlayer = player;
+      };
+
+      if (window.Spotify) {
+        initPlayer();
+        return;
+      }
+
+      window.onSpotifyWebPlaybackSDKReady = initPlayer;
+      scriptEl = document.createElement("script");
+      scriptEl.src = "https://sdk.scdn.co/spotify-player.js";
+      scriptEl.async = true;
+      document.body.appendChild(scriptEl);
+    };
+
+    setup().catch(() => {
+      // keep silent; playback can still work with existing active devices
+    });
+
+    return () => {
+      disposed = true;
+      sdkPlayer?.disconnect();
+      if (scriptEl?.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    };
+  }, [spotifyConnected, id]);
 
   async function loadAll() {
     try {
@@ -289,9 +368,7 @@ function ExecutarPage() {
         </div>
       )}
 
-      <main
-        className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-6 pt-20 pb-24"
-      >
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-4 py-6 pt-20 pb-24">
         {groups.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Nenhum momento configurado nesta sessão.
@@ -307,6 +384,9 @@ function ExecutarPage() {
               <p className="truncate text-xs text-muted-foreground">
                 {currentTrack?.artists_json?.[0] ?? "Sem artista"}
               </p>
+              {currentTrack?.note && (
+                <p className="mt-2 line-clamp-2 text-xs text-foreground/80">{currentTrack.note}</p>
+              )}
             </section>
 
             <div className="mb-4 overflow-x-auto pb-1">
@@ -337,7 +417,7 @@ function ExecutarPage() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto">
+            <div className="flex-1 min-h-0 space-y-3 overflow-y-auto pb-56">
               <p className="px-1 text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
                 Sequence
               </p>
@@ -390,6 +470,11 @@ function ExecutarPage() {
                             ? "Completed"
                             : `Track: ${item.track.track_name}`}
                       </p>
+                      {item.track.note && (
+                        <p className="mt-1 line-clamp-2 text-xs text-foreground/75">
+                          {item.track.note}
+                        </p>
+                      )}
                     </div>
                     <span className="text-muted-foreground/80">
                       {isActive ? "⋮" : "▷"}
@@ -399,67 +484,62 @@ function ExecutarPage() {
               })}
             </div>
 
-            <div className="mt-4 flex-shrink-0 border-t border-border/60 bg-gradient-to-t from-background via-background to-transparent pt-5 pb-3">
-              <div className="flex items-center justify-center gap-8">
-                <button
-                  onClick={goPrev}
-                  disabled={!canGoPrev()}
-                  className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
-                  aria-label="Anterior"
-                >
-                  <SkipBack className="h-5 w-5" />
-                </button>
-
-                <button
-                  onClick={togglePlay}
-                  disabled={busy || !currentTrack?.spotify_uri}
-                  className={`${playBtnClass} transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100`}
-                  aria-label={playing ? "Pausar" : "Reproduzir"}
-                >
-                  {busy ? (
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
-                  ) : playing ? (
-                    <Pause className="h-6 w-6" />
-                  ) : (
-                    <Play className="ml-0.5 h-6 w-6" />
-                  )}
-                </button>
-
-                <button
-                  onClick={goNext}
-                  disabled={!canGoNext()}
-                  className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
-                  aria-label="Próximo"
-                >
-                  <SkipForward className="h-5 w-5" />
-                </button>
-              </div>
-
-              {currentTrack && (
-                <div className="mx-auto mt-3 max-w-xs text-center text-xs">
-                  <p className="truncate font-medium text-foreground/80">
-                    {currentTrack.track_name}
-                  </p>
-                  {currentTrack.artists_json?.[0] && (
-                    <p className="truncate text-muted-foreground/60">
-                      {currentTrack.artists_json[0]}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <button
-                onClick={handlePause}
-                disabled={busy}
-                className="mx-auto mt-4 flex w-full max-w-sm items-center justify-center gap-2 rounded-lg border border-destructive/70 bg-transparent px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-destructive transition hover:bg-destructive/10 disabled:opacity-40"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Emergency Stop
-              </button>
-            </div>
           </>
         )}
       </main>
+
+      <section className="fixed inset-x-0 bottom-16 z-40 border-t border-border/60 bg-background/95 backdrop-blur">
+        <div className="mx-auto w-full max-w-4xl px-4 pt-3 pb-3">
+          {currentTrack && (
+            <div className="mx-auto mb-2 max-w-sm text-center text-xs">
+              <p className="truncate font-medium text-foreground/80">{currentTrack.track_name}</p>
+              {currentTrack.artists_json?.[0] && (
+                <p className="truncate text-muted-foreground/60">{currentTrack.artists_json[0]}</p>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-center gap-8">
+            <button
+              onClick={goPrev}
+              disabled={!canGoPrev()}
+              className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
+              aria-label="Anterior"
+            >
+              <SkipBack className="h-5 w-5" />
+            </button>
+            <button
+              onClick={togglePlay}
+              disabled={busy || !currentTrack?.spotify_uri}
+              className={`${playBtnClass} transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100`}
+              aria-label={playing ? "Pausar" : "Reproduzir"}
+            >
+              {busy ? (
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
+              ) : playing ? (
+                <Pause className="h-6 w-6" />
+              ) : (
+                <Play className="ml-0.5 h-6 w-6" />
+              )}
+            </button>
+            <button
+              onClick={goNext}
+              disabled={!canGoNext()}
+              className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
+              aria-label="Próximo"
+            >
+              <SkipForward className="h-5 w-5" />
+            </button>
+          </div>
+          <button
+            onClick={handlePause}
+            disabled={busy}
+            className="mx-auto mt-3 flex w-full max-w-sm items-center justify-center gap-2 rounded-lg border border-destructive/70 bg-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-destructive transition hover:bg-destructive/10 disabled:opacity-40"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Emergency Stop
+          </button>
+        </div>
+      </section>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 py-1 backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-4xl grid-cols-4">
