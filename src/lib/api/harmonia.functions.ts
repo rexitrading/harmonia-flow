@@ -273,6 +273,15 @@ export const getSpotifyConnectionStatus = createServerFn({ method: "GET" }).hand
   return { connected: !!result.rows[0], account: result.rows[0] ?? null };
 });
 
+export const disconnectSpotifyAccount = createServerFn({ method: "POST" }).handler(async () => {
+  const db = getDb();
+  const session = await useAppSession();
+  const userId = requireUser(session);
+
+  await db.query("DELETE FROM spotify_accounts WHERE user_id = $1", [userId]);
+  return { ok: true };
+});
+
 export const listSpotifyPlaylists = createServerFn({ method: "GET" }).handler(async () => {
   const { spotifyGet } = await import("@/lib/spotify.server");
   const session = await useAppSession();

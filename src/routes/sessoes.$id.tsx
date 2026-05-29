@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import {
   addMoment,
   addTrack,
+  disconnectSpotifyAccount,
   getSpotifyConnectionStatus,
   getSpotifyDevices,
   getSpotifySdkToken,
@@ -231,6 +232,16 @@ function SessaoDetail() {
     }
   }
 
+  async function handleDisconnectSpotify() {
+    try {
+      await disconnectSpotifyAccount();
+      toast.success("Conta Spotify desconectada");
+      await loadSpotify();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Erro ao desconectar Spotify");
+    }
+  }
+
   async function handleImportPlaylist() {
     if (!selectedPlaylistId) return;
     try {
@@ -398,6 +409,7 @@ function SessaoDetail() {
               <div className="flex flex-wrap gap-2">
                 <Button variant={playbackMode === "remote" ? "default" : "outline"} onClick={() => setPlaybackMode("remote")}>Controle remoto</Button>
                 <Button variant={playbackMode === "sdk" ? "default" : "outline"} onClick={() => setPlaybackMode("sdk")}>SDK Web Player</Button>
+                <Button variant="outline" onClick={handleDisconnectSpotify}>Desconectar Spotify</Button>
                 {playbackMode === "sdk" && (
                   <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
                     {sdkReady ? "SDK pronto" : "Inicializando SDK..."}
