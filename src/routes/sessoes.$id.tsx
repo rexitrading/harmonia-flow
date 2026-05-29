@@ -583,8 +583,8 @@ function SessaoDetail() {
               <button
                 type="button"
                 onClick={() => {
-                  const target = `/sessoes/${id}/executar`;
-                  navigate({ to: "/sessoes/$id/executar", params: { id } }).catch(() => {
+                  const target = `/sessoes/executar/${id}`;
+                  navigate({ to: "/sessoes/executar/$id", params: { id } }).catch(() => {
                     window.location.href = target;
                   });
                   window.location.href = target;
@@ -993,7 +993,7 @@ function SessaoDetail() {
             </div>
             <div className="flex items-center gap-2">
               <a
-                href={`/sessoes/${id}/executar`}
+                href={`/sessoes/executar/${id}`}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent transition hover:bg-accent/20"
                 aria-label="Ir para execução"
               >

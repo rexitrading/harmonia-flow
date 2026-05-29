@@ -25,7 +25,7 @@ import {
   spotifyPausePlayback,
 } from "@/lib/api/harmonia.functions";
 
-export const Route = createFileRoute("/sessoes/$id/executar")({
+export const Route = createFileRoute("/sessoes/executar/$id")({
   head: () => ({ meta: [{ title: "Execução — Harmonia" }] }),
   component: ExecutarPage,
 });

@@ -14,7 +14,7 @@ import { Route as SessoesRouteRouteImport } from './routes/sessoes.route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessoesIndexRouteImport } from './routes/sessoes.index'
 import { Route as SessoesIdRouteImport } from './routes/sessoes.$id'
-import { Route as SessoesIdExecutarRouteImport } from './routes/sessoes.$id.executar'
+import { Route as SessoesExecutarIdRouteImport } from './routes/sessoes.executar.$id'
 import { Route as AuthSpotifyCallbackRouteImport } from './routes/auth.spotify.callback'
 
 const LoginRoute = LoginRouteImport.update({
@@ -42,10 +42,10 @@ const SessoesIdRoute = SessoesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => SessoesRouteRoute,
 } as any)
-const SessoesIdExecutarRoute = SessoesIdExecutarRouteImport.update({
-  id: '/executar',
-  path: '/executar',
-  getParentRoute: () => SessoesIdRoute,
+const SessoesExecutarIdRoute = SessoesExecutarIdRouteImport.update({
+  id: '/executar/$id',
+  path: '/executar/$id',
+  getParentRoute: () => SessoesRouteRoute,
 } as any)
 const AuthSpotifyCallbackRoute = AuthSpotifyCallbackRouteImport.update({
   id: '/auth/spotify/callback',
@@ -57,28 +57,28 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
-  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
+  '/sessoes/executar/$id': typeof SessoesExecutarIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
-  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
+  '/sessoes/executar/$id': typeof SessoesExecutarIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sessoes': typeof SessoesRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/sessoes/$id': typeof SessoesIdRouteWithChildren
+  '/sessoes/$id': typeof SessoesIdRoute
   '/sessoes/': typeof SessoesIndexRoute
   '/auth/spotify/callback': typeof AuthSpotifyCallbackRoute
-  '/sessoes/$id/executar': typeof SessoesIdExecutarRoute
+  '/sessoes/executar/$id': typeof SessoesExecutarIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -89,7 +89,7 @@ export interface FileRouteTypes {
     | '/sessoes/$id'
     | '/sessoes/'
     | '/auth/spotify/callback'
-    | '/sessoes/$id/executar'
+    | '/sessoes/executar/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -97,7 +97,7 @@ export interface FileRouteTypes {
     | '/sessoes/$id'
     | '/sessoes'
     | '/auth/spotify/callback'
-    | '/sessoes/$id/executar'
+    | '/sessoes/executar/$id'
   id:
     | '__root__'
     | '/'
@@ -106,7 +106,7 @@ export interface FileRouteTypes {
     | '/sessoes/$id'
     | '/sessoes/'
     | '/auth/spotify/callback'
-    | '/sessoes/$id/executar'
+    | '/sessoes/executar/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -153,12 +153,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessoesIdRouteImport
       parentRoute: typeof SessoesRouteRoute
     }
-    '/sessoes/$id/executar': {
-      id: '/sessoes/$id/executar'
-      path: '/executar'
-      fullPath: '/sessoes/$id/executar'
-      preLoaderRoute: typeof SessoesIdExecutarRouteImport
-      parentRoute: typeof SessoesIdRoute
+    '/sessoes/executar/$id': {
+      id: '/sessoes/executar/$id'
+      path: '/executar/$id'
+      fullPath: '/sessoes/executar/$id'
+      preLoaderRoute: typeof SessoesExecutarIdRouteImport
+      parentRoute: typeof SessoesRouteRoute
     }
     '/auth/spotify/callback': {
       id: '/auth/spotify/callback'
@@ -170,26 +170,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface SessoesIdRouteChildren {
-  SessoesIdExecutarRoute: typeof SessoesIdExecutarRoute
-}
-
-const SessoesIdRouteChildren: SessoesIdRouteChildren = {
-  SessoesIdExecutarRoute: SessoesIdExecutarRoute,
-}
-
-const SessoesIdRouteWithChildren = SessoesIdRoute._addFileChildren(
-  SessoesIdRouteChildren,
-)
-
 interface SessoesRouteRouteChildren {
-  SessoesIdRoute: typeof SessoesIdRouteWithChildren
+  SessoesIdRoute: typeof SessoesIdRoute
   SessoesIndexRoute: typeof SessoesIndexRoute
+  SessoesExecutarIdRoute: typeof SessoesExecutarIdRoute
 }
 
 const SessoesRouteRouteChildren: SessoesRouteRouteChildren = {
-  SessoesIdRoute: SessoesIdRouteWithChildren,
+  SessoesIdRoute: SessoesIdRoute,
   SessoesIndexRoute: SessoesIndexRoute,
+  SessoesExecutarIdRoute: SessoesExecutarIdRoute,
 }
 
 const SessoesRouteRouteWithChildren = SessoesRouteRoute._addFileChildren(
