@@ -9,8 +9,6 @@ import {
   Pause,
   SkipBack,
   SkipForward,
-  Car,
-  Smartphone,
   Home,
   ListMusic,
   Library,
@@ -79,7 +77,6 @@ function ExecutarPage() {
   const [playing, setPlaying] = useState(false);
   const [currentMomentIdx, setCurrentMomentIdx] = useState(0);
   const [currentTrackIdx, setCurrentTrackIdx] = useState(0);
-  const [condutorMode, setCondutorMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [momentFilter, setMomentFilter] = useState<string>("__all__");
 
@@ -246,13 +243,9 @@ function ExecutarPage() {
     return <ExecutarSkeleton />;
   }
 
-  const btnClass = condutorMode
-    ? "h-14 w-14 rounded-full flex items-center justify-center text-muted-foreground"
-    : "h-10 w-10 rounded-full flex items-center justify-center text-muted-foreground";
-
-  const playBtnClass = condutorMode
-    ? "h-16 w-16 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-[var(--shadow-glow)] ring-1 ring-primary/20"
-    : "h-12 w-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-[var(--shadow-glow)] ring-1 ring-primary/10";
+  const btnClass = "h-12 w-12 rounded-full flex items-center justify-center text-muted-foreground";
+  const playBtnClass =
+    "h-16 w-16 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-[var(--shadow-glow)] ring-1 ring-primary/20";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -266,26 +259,9 @@ function ExecutarPage() {
             <ChevronLeft className="h-3.5 w-3.5" />
             {sessao.title}
           </Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCondutorMode((c) => !c)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                condutorMode
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {condutorMode ? (
-                <span className="flex items-center gap-1.5">
-                  <Car className="h-3.5 w-3.5" /> Condutor
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <Smartphone className="h-3.5 w-3.5" /> Normal
-                </span>
-              )}
-            </button>
-          </div>
+          <span className="rounded-full bg-accent/15 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-accent">
+            Active Session
+          </span>
         </div>
       </header>
 
@@ -304,26 +280,8 @@ function ExecutarPage() {
         </div>
       )}
 
-      {deviceList.length > 0 && (
-        <div className="mx-auto mt-20 w-full max-w-4xl px-4">
-          <select
-            value={selectedDeviceId}
-            onChange={(e) => setSelectedDeviceId(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
-          >
-            {deviceList.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({d.type}) {d.is_active ? "ativo" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <main
-        className={`mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 ${
-          condutorMode ? "py-4 pt-20 pb-24" : "py-6 pt-20 pb-24"
-        }`}
+        className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-6 pt-20 pb-24"
       >
         {groups.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -437,30 +395,28 @@ function ExecutarPage() {
                 condutorMode ? "pt-6 pb-6 mt-4" : "pt-5 pb-3 mt-4"
               }`}
             >
-              <div
-                className={`flex items-center justify-center ${condutorMode ? "gap-10" : "gap-8"}`}
-              >
+              <div className="flex items-center justify-center gap-8">
                 <button
                   onClick={goPrev}
                   disabled={!canGoPrev()}
                   className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
                   aria-label="Anterior"
                 >
-                  <SkipBack className={condutorMode ? "h-6 w-6" : "h-5 w-5"} />
+                  <SkipBack className="h-5 w-5" />
                 </button>
 
                 <button
                   onClick={togglePlay}
-                  disabled={busy || !currentTrack?.spotify_uri || !selectedDeviceId}
+                  disabled={busy || !currentTrack?.spotify_uri}
                   className={`${playBtnClass} transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100`}
                   aria-label={playing ? "Pausar" : "Reproduzir"}
                 >
                   {busy ? (
                     <span className="h-5 w-5 animate-spin rounded-full border-2 border-background border-t-transparent" />
                   ) : playing ? (
-                    <Pause className={condutorMode ? "h-7 w-7" : "h-6 w-6"} />
+                    <Pause className="h-6 w-6" />
                   ) : (
-                    <Play className={condutorMode ? "h-7 w-7 ml-0.5" : "h-6 w-6 ml-0.5"} />
+                    <Play className="ml-0.5 h-6 w-6" />
                   )}
                 </button>
 
@@ -470,14 +426,12 @@ function ExecutarPage() {
                   className={`${btnClass} transition-all duration-200 hover:bg-secondary/60 hover:text-foreground active:scale-90 disabled:opacity-20 disabled:hover:bg-transparent`}
                   aria-label="Próximo"
                 >
-                  <SkipForward className={condutorMode ? "h-6 w-6" : "h-5 w-5"} />
+                  <SkipForward className="h-5 w-5" />
                 </button>
               </div>
 
               {currentTrack && (
-                <div
-                  className={`mx-auto mt-3 max-w-xs text-center ${condutorMode ? "text-sm" : "text-xs"}`}
-                >
+                <div className="mx-auto mt-3 max-w-xs text-center text-xs">
                   <p className="truncate font-medium text-foreground/80">
                     {currentTrack.track_name}
                   </p>
@@ -491,7 +445,7 @@ function ExecutarPage() {
 
               <button
                 onClick={handlePause}
-                disabled={!selectedDeviceId || busy}
+                disabled={busy}
                 className="mx-auto mt-4 flex w-full max-w-sm items-center justify-center gap-2 rounded-lg border border-destructive/70 bg-transparent px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-destructive transition hover:bg-destructive/10 disabled:opacity-40"
               >
                 <AlertTriangle className="h-4 w-4" />

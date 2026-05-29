@@ -582,7 +582,13 @@ function SessaoDetail() {
               </Button>
               <button
                 type="button"
-                onClick={() => navigate({ to: "/sessoes/$id/executar", params: { id } })}
+                onClick={() => {
+                  const target = `/sessoes/${id}/executar`;
+                  navigate({ to: "/sessoes/$id/executar", params: { id } }).catch(() => {
+                    window.location.href = target;
+                  });
+                  window.location.href = target;
+                }}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all duration-200 hover:scale-[1.02]"
               >
                 <Play className="h-4 w-4" />
@@ -986,14 +992,13 @@ function SessaoDetail() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to="/sessoes/$id/executar"
-                params={{ id }}
+              <a
+                href={`/sessoes/${id}/executar`}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent transition hover:bg-accent/20"
                 aria-label="Ir para execução"
               >
                 <SkipForward className="h-4 w-4" />
-              </Link>
+              </a>
               <button
                 onClick={handlePausePlayback}
                 disabled={!selectedDeviceId}
