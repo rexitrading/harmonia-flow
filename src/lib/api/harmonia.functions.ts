@@ -88,6 +88,7 @@ async function getPlaybackToken(eventId: string, userId: string) {
       [eventId],
     );
     if (!owner.rows[0]) throw new Error("Evento não encontrado");
+
     const shareCheck = await db.query(
       "SELECT id FROM event_shares WHERE event_id = $1 AND shared_with_user_id = $2",
       [eventId, userId],
@@ -95,7 +96,14 @@ async function getPlaybackToken(eventId: string, userId: string) {
     if (!shareCheck.rows[0] && owner.rows[0].owner_user_id !== userId) {
       throw new Error("Sem acesso ao Spotify do evento");
     }
-    return await getValidSpotifyAccessToken(owner.rows[0].owner_user_id);
+
+    try {
+      return await getValidSpotifyAccessToken(owner.rows[0].owner_user_id);
+    } catch {
+      throw new Error(
+        "A conta Spotify do proprietário expirou. Solicite que ele desconecte e reconecte o Spotify nas configurações da sessão.",
+      );
+    }
   }
 }
 
