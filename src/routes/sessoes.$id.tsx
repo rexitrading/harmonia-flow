@@ -246,7 +246,10 @@ function SessaoDetail() {
       setSpotifyConnected(status.connected);
       setSpotifyDisplayName(status.account?.display_name ?? null);
       if (status.connected) {
-        const [pls, devs] = await Promise.all([listSpotifyPlaylists(), getSpotifyDevices()]);
+        const [pls, devs] = await Promise.all([
+          listSpotifyPlaylists().catch(() => []),
+          getSpotifyDevices().catch(() => [] as SpotifyDevice[]),
+        ]);
         setPlaylists(pls as Array<{ id: string; name: string; tracks: { total: number } }>);
         const typed = devs as SpotifyDevice[];
         setDevices(typed);

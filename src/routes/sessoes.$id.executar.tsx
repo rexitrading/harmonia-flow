@@ -97,7 +97,7 @@ function ExecutarPage() {
       setFaixas(detail.tracks as Faixa[]);
       setSpotifyConnected(status.connected);
       if (status.connected) {
-        const devs = (await getSpotifyDevices()) as SpotifyDevice[];
+        const devs = (await getSpotifyDevices().catch(() => [])) as SpotifyDevice[];
         setDeviceList(devs);
         const active = devs.find((d) => d.is_active);
         if (active?.id) setSelectedDeviceId(active.id);
