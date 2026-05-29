@@ -580,14 +580,14 @@ function SessaoDetail() {
                 <Share2 className="h-3.5 w-3.5" />
                 Compartilhar
               </Button>
-              <Link
-                to="/sessoes/$id/executar"
-                params={{ id }}
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/sessoes/$id/executar", params: { id } })}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all duration-200 hover:scale-[1.02]"
               >
                 <Play className="h-4 w-4" />
                 Executar
-              </Link>
+              </button>
             </div>
           </div>
         </div>
