@@ -788,10 +788,48 @@ export const updateMoment = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const db = getDb();
-    await db.query(
-      `UPDATE moments SET name = COALESCE($2, name), order_index = COALESCE($3, order_index), updated_at = now() WHERE id = $1`,
-      [data.momentId, data.name ?? null, data.orderIndex ?? null],
+    const current = await db.query<{ id: string; event_id: string; order_index: number }>(
+      "SELECT id, event_id, order_index FROM moments WHERE id = $1",
+      [data.momentId],
     );
+    if (!current.rows[0]) throw new Error("Momento não encontrado");
+
+    const currentRow = current.rows[0];
+    const targetOrder = data.orderIndex;
+    const targetChanged = typeof targetOrder === "number" && targetOrder !== currentRow.order_index;
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [currentRow.event_id]);
+
+      if (targetChanged) {
+        // Safe swap to avoid violating UNIQUE (event_id, order_index) during reordering.
+        await client.query("UPDATE moments SET order_index = -2147483648 WHERE id = $1", [data.momentId]);
+        await client.query(
+          "UPDATE moments SET order_index = $1 WHERE event_id = $2 AND order_index = $3 AND id <> $4",
+          [currentRow.order_index, currentRow.event_id, targetOrder, data.momentId],
+        );
+        await client.query(
+          `UPDATE moments
+           SET order_index = $2, name = COALESCE($3, name), updated_at = now()
+           WHERE id = $1`,
+          [data.momentId, targetOrder, data.name ?? null],
+        );
+      } else if (data.name) {
+        await client.query("UPDATE moments SET name = $2, updated_at = now() WHERE id = $1", [
+          data.momentId,
+          data.name,
+        ]);
+      }
+
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
     return { ok: true };
   });
 
