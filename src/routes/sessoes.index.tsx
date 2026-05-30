@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -332,18 +339,22 @@ function SessionCard({
         <label className="mb-1 block text-[10px] uppercase tracking-wider text-muted-foreground">
           Status
         </label>
-        <select
+        <Select
           value={sessao.status}
           disabled={!!sessao.shared}
-          onChange={(e) => onChangeStatus(e.target.value as Sessao["status"])}
-          className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          onValueChange={(value) => onChangeStatus(value as Sessao["status"])}
         >
-          <option value="draft">Rascunho</option>
-          <option value="ready">Pronta</option>
-          <option value="live">Ao vivo</option>
-          <option value="finished">Encerrada</option>
-          <option value="archived">Arquivada</option>
-        </select>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="draft">Rascunho</SelectItem>
+            <SelectItem value="ready">Pronta</SelectItem>
+            <SelectItem value="live">Ao vivo</SelectItem>
+            <SelectItem value="finished">Encerrada</SelectItem>
+            <SelectItem value="archived">Arquivada</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <Link to="/sessoes/$id" params={{ id: sessao.id }} className="block pr-10">
         <div className="flex items-start justify-between gap-2">

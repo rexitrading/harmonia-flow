@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -683,35 +690,38 @@ function SessaoDetail() {
                   )}
                 </div>
                 <div className="flex flex-col gap-3 md:flex-row">
-                  <select
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    value={selectedPlaylistId}
-                    onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                  <Select
+                    value={selectedPlaylistId || undefined}
+                    onValueChange={setSelectedPlaylistId}
                   >
-                    <option value="">Selecione uma playlist</option>
-                    {playlists.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.tracks?.total ?? 0} faixas)
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma playlist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {playlists.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({p.tracks?.total ?? 0} faixas)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button onClick={handleImportPlaylist} disabled={!selectedPlaylistId} size="sm">
                     Importar
                   </Button>
                 </div>
                 <div className="flex flex-col gap-3 md:flex-row">
-                  <select
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    value={selectedDeviceId}
-                    onChange={(e) => setSelectedDeviceId(e.target.value)}
-                  >
-                    <option value="">Selecione um device Spotify</option>
-                    {devices.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.type}) {d.is_active ? "- ativo" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={selectedDeviceId || undefined} onValueChange={setSelectedDeviceId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um device Spotify" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {devices.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} ({d.type}) {d.is_active ? "- ativo" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="outline"
                     onClick={handlePausePlayback}
@@ -856,22 +866,27 @@ function SessaoDetail() {
                 {tracks.length > 0 && !executionMode && (
                   <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/30 p-3 sm:flex-row sm:items-center">
                     <span className="text-xs text-muted-foreground">Mover todas deste momento para:</span>
-                    <select
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm sm:max-w-xs"
-                      value={movingAllByMoment[m.id] ?? ""}
-                      onChange={(e) =>
-                        setMovingAllByMoment((prev) => ({ ...prev, [m.id]: e.target.value }))
-                      }
-                    >
-                      <option value="">Selecione um momento</option>
-                      {momentos
-                        .filter((mom) => mom.id !== m.id)
-                        .map((mom) => (
-                          <option key={mom.id} value={mom.id}>
-                            {mom.name}
-                          </option>
-                        ))}
-                    </select>
+                    <div className="w-full sm:max-w-xs">
+                      <Select
+                        value={movingAllByMoment[m.id] || undefined}
+                        onValueChange={(value) =>
+                          setMovingAllByMoment((prev) => ({ ...prev, [m.id]: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um momento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {momentos
+                            .filter((mom) => mom.id !== m.id)
+                            .map((mom) => (
+                              <SelectItem key={mom.id} value={mom.id}>
+                                {mom.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
@@ -945,17 +960,21 @@ function SessaoDetail() {
                       </button>
                     </div>
                     <div className="mb-3">
-                      <select
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      <Select
                         value={f.moment_id}
-                        onChange={(e) => handleChangeTrackMoment(f.id, e.target.value)}
+                        onValueChange={(value) => handleChangeTrackMoment(f.id, value)}
                       >
-                        {momentos.map((mom) => (
-                          <option key={mom.id} value={mom.id}>
-                            {mom.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {momentos.map((mom) => (
+                            <SelectItem key={mom.id} value={mom.id}>
+                              {mom.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <Textarea
                       value={f.note ?? ""}
@@ -1092,18 +1111,21 @@ function SessaoDetail() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
-              <select
-                value={selectedShareUserId}
-                onChange={(e) => setSelectedShareUserId(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              <Select
+                value={selectedShareUserId || undefined}
+                onValueChange={setSelectedShareUserId}
               >
-                <option value="">Selecione um usuário</option>
-                {userList.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.email})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userList.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} ({u.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button onClick={handleShare} disabled={!selectedShareUserId || shareBusy}>
                 {shareBusy ? "..." : "Compartilhar"}
               </Button>

@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 
@@ -54,6 +55,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "theme-color", content: "#131314" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
       { title: "Harmonia — Gestão Musical da Loja" },
       {
         name: "description",
@@ -70,6 +73,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap",
       },
       { rel: "icon", href: "https://cdn.ggailabs.com/portal/harmonia-app.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -94,6 +98,17 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    void import("virtual:pwa-register")
+      .then(({ registerSW }) => {
+        registerSW({ immediate: true });
+      })
+      .catch((error) => {
+        console.error("PWA register error", error);
+      });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
